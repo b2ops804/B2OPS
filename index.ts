@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('DB_SERVICE_KEY') || '';
-const VAPID_PUBLIC  = Deno.env.get('VAPID_PUBLIC_KEY')  || 'rkR0TXFrGBc7s9gAGyNoOMzMPuKE_rOmtNUcGoRhnhvG0GQZx4KR3A0pnAeSrX6qGnpNbabxsvaW81FAQb4CSQ';
+const VAPID_PUBLIC  = Deno.env.get('VAPID_PUBLIC_KEY')  || 'BPJ5Dl0d6LLYneGm1AXPX9xjBRLuI4EUkxNB36qzu43gkmG9yJtRK3nlQFQqaKLhgNw3oQxoUx7LB9vUDc2sbjI';
 const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY') || '';
 const VAPID_SUBJECT = 'mailto:b2ops804@gmail.com';
 
