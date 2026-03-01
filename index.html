@@ -1395,6 +1395,10 @@ textarea.finput{resize:none;min-height:80px}
       <label class="flabel">Owner Name</label>
       <input class="finput" id="set-owner-name" placeholder="Owner"/>
     </div>
+    <div class="fgroup">
+      <label class="flabel">Owner Phone (for SMS alerts)</label>
+      <input class="finput" id="set-owner-phone" placeholder="+1xxxxxxxxxx" type="tel"/>
+    </div>
     <button class="btn fill-gold full bebas" onclick="saveSettings()">Save Settings</button>
     <div class="divider"></div>
     <div class="sec">Notifications</div>
@@ -2027,6 +2031,7 @@ async function loadUserProfile(user) {
   setTimeout(() => notifyStaffLogin(profile), 2000);
   S.settings.storeName = profile.store_name || 'My Store';
   S.settings.ownerName = profile.owner_name || '';
+  S.settings.ownerPhone = profile.phone || '';
   S_customRoles = profile.custom_roles ? JSON.parse(profile.custom_roles) : [];
   await refreshAllData();
   hideLoading();
@@ -2135,6 +2140,9 @@ async function refreshAllData() {
   } catch(e) { S_notifSettings = null; }
   // Update notification badge
   updateNotifBadge();
+  // Scheduled SMS checks — run every 10 minutes
+  setInterval(runScheduledSmsChecks, 10 * 60 * 1000);
+
   // Run background notification checks (async, non-blocking)
   setTimeout(() => runBackgroundNotificationChecks(), 3000);
   if(loySet.data) {
@@ -3502,6 +3510,7 @@ function renderHistory(){
 function loadSettings(){
   document.getElementById('set-store-name').value=S.settings.storeName||'';
   document.getElementById('set-owner-name').value=S.settings.ownerName||'';
+  document.getElementById('set-owner-phone').value=S.settings.ownerPhone||'';
   // Show team option only for owners
   const teamBtn=document.getElementById('settings-team-btn');
   if(teamBtn)teamBtn.style.display=currentProfile?.role==='owner'?'block':'none';
@@ -3510,10 +3519,11 @@ function loadSettings(){
 async function saveSettings(){
   const storeName=document.getElementById('set-store-name').value.trim()||'My Store';
   const ownerName=document.getElementById('set-owner-name').value.trim();
+  const ownerPhone=document.getElementById('set-owner-phone')?.value.trim()||'';
   showLoading('Saving...');
-  await sb.from('profiles').update({store_name:storeName,owner_name:ownerName}).eq('id',currentProfile.id);
+  await sb.from('profiles').update({store_name:storeName,owner_name:ownerName,phone:ownerPhone||null}).eq('id',currentProfile.id);
   currentProfile.store_name=storeName;currentProfile.owner_name=ownerName;
-  S.settings.storeName=storeName;S.settings.ownerName=ownerName;
+  S.settings.storeName=storeName;S.settings.ownerName=ownerName;S.settings.ownerPhone=ownerPhone;
   // Refresh home display if it exists
   const homeEl=document.getElementById('home-store-name');
   if(homeEl){ renderHome(); }
@@ -6520,12 +6530,86 @@ async function checkMultiLowStock() {
   }
 }
 
+
+// ── Scheduled SMS checks (daily summary, weekly report, monthly summary) ──
+async function runScheduledSmsChecks() {
+  if(!S_twilioConfig?.master_enabled) return;
+  const s   = S_smsSettings || {};
+  const own = getOwnerPhone();
+  if(!own) return;
+
+  const now   = new Date();
+  const hhmm  = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const today = now.toISOString().slice(0,10);
+  const store = S.settings?.storeName || 'Store';
+
+  // Daily summary
+  if(s.daily_summary) {
+    const sendTime = s.daily_summary_time || '20:00';
+    const window = hhmm >= sendTime && hhmm <= sendTime.replace(':','').padStart(4,'0').slice(0,2) + ':' + (parseInt(sendTime.slice(3))+9).toString().padStart(2,'0');
+    if(hhmm >= sendTime && hhmm <= sendTime.slice(0,3) + (parseInt(sendTime.slice(3))+9).toString().padStart(2,'0')) {
+      const sentToday = S_smsLog.find(l => l.type === 'daily_summary' && l.created_at?.slice(0,10) === today);
+      if(!sentToday) {
+        const todayRev = S.sales.filter(s => s.date === today).reduce((a,s) => a+(s.total||0), 0);
+        const todayTxn = S.sales.filter(s => s.date === today).length;
+        smsSend(own, `${store} Daily Summary: ${todayTxn} transactions · ${fmt(todayRev)} revenue today`, 'daily_summary');
+      }
+    }
+  }
+
+  // Weekly report
+  if(s.weekly_report) {
+    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const todayDay = days[now.getDay()];
+    if(todayDay === (s.weekly_report_day || 'monday') && hhmm >= '09:00') {
+      const sentThisWeek = S_smsLog.find(l => l.type === 'weekly_report' && l.created_at?.slice(0,10) === today);
+      if(!sentThisWeek) {
+        const weekAgo = new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+        const weekRev = S.sales.filter(s => s.date >= weekAgo && s.date < today).reduce((a,s) => a+(s.total||0), 0);
+        const weekTxn = S.sales.filter(s => s.date >= weekAgo && s.date < today).length;
+        smsSend(own, `${store} Weekly Report: ${weekTxn} transactions · ${fmt(weekRev)} revenue this week`, 'weekly_report');
+      }
+    }
+  }
+
+  // Monthly summary (1st of month)
+  if(s.monthly_summary && now.getDate() === 1 && hhmm >= '09:00') {
+    const sentToday = S_smsLog.find(l => l.type === 'monthly_summary' && l.created_at?.slice(0,10) === today);
+    if(!sentToday) {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
+      const monthRev = S.sales.filter(s => s.date?.slice(0,7) === lastMonth).reduce((a,s) => a+(s.total||0), 0);
+      const monthTxn = S.sales.filter(s => s.date?.slice(0,7) === lastMonth).length;
+      smsSend(own, `${store} Monthly Summary (${lastMonth}): ${monthTxn} transactions · ${fmt(monthRev)} revenue`, 'monthly_summary');
+    }
+  }
+}
+
 async function runBackgroundNotificationChecks() {
   const s = S_notifSettings || {};
   const bid = String(bizId());
 
   // Multi low stock bundled alert
   checkMultiLowStock();
+
+  // Slow day check (only fire after 3pm)
+  const nowHour = new Date().getHours();
+  if(nowHour >= 15 && (S_notifSettings?.slow_day) !== false) {
+    const todayStr = new Date().toISOString().slice(0,10);
+    const todayRev = S.sales.filter(s => s.date === todayStr).reduce((a,s) => a+(s.total||0), 0);
+    // Calculate average daily revenue over past 30 days
+    const pastSales = S.sales.filter(s => s.date < todayStr);
+    const days30 = [...new Set(pastSales.map(s=>s.date))].slice(-30);
+    if(days30.length >= 7) {
+      const avgRev = days30.reduce((a,d) => a + pastSales.filter(s=>s.date===d).reduce((x,s)=>x+(s.total||0),0), 0) / days30.length;
+      if(avgRev > 0 && todayRev < avgRev * 0.5) {
+        const alreadyToday = S_notifications.find(n => n.type === 'slow_day' && n.created_at >= todayStr);
+        if(!alreadyToday) {
+          await createNotification('slow_day', 'Slow Day Alert', `Today's revenue (${fmt(todayRev)}) is well below your daily average (${fmt(avgRev)})`, 'gen-report');
+        }
+      }
+    }
+  }
+
   // Background SMS checks
   runBackgroundSmsChecks();
 
@@ -6540,6 +6624,7 @@ async function runBackgroundNotificationChecks() {
         );
         if(!alreadyToday) {
           await createNotification('out_of_stock', 'Out of Stock', `${p.name} has 0 ${p.unit||'units'} remaining`, 'inventory', String(p.id));
+          smsOutOfStock(p);
         }
       } else if(p.stock > 0 && p.stock <= (p.low_stock_threshold||5) && s.low_stock !== false) {
         const alreadyToday = S_notifications.find(n =>
@@ -6548,6 +6633,7 @@ async function runBackgroundNotificationChecks() {
         );
         if(!alreadyToday) {
           await createNotification('low_stock', 'Low Stock', `${p.name} is down to ${p.stock} ${p.unit||'units'}`, 'inventory', String(p.id));
+          smsLowStock(p);
         }
       }
     });
@@ -6566,6 +6652,7 @@ async function runBackgroundNotificationChecks() {
         );
         if(!alreadyThisWeek) {
           await createNotification('dead_stock', 'Dead Stock Alert', `${p.name} hasn't sold in 30+ days (${p.stock} ${p.unit||'units'} in stock)`, 'inventory', String(p.id));
+          if(S_smsSettings?.dead_stock) smsSend(getOwnerPhone(), `${S.settings?.storeName||'Store'}: Dead stock — ${p.name} hasn't sold in 30+ days`, 'dead_stock');
         }
       }
     });
@@ -6610,6 +6697,7 @@ async function runBackgroundNotificationChecks() {
             `${custName(c)} has ${c.loyalty_points} pts expiring in ${daysLeft} day${daysLeft>1?'s':''}`,
             'customer-profile', String(c.id)
           );
+          if(S_smsSettings?.points_expiring_alert) smsSend(getOwnerPhone(), `${S.settings?.storeName||'Store'}: ${custName(c)} has ${c.loyalty_points} pts expiring in ${daysLeft} days`, 'points_expiring_alert');
         }
       }
     });
@@ -6757,6 +6845,7 @@ async function processLoyaltyForSale(saleRow, total) {
         business_id: bid, customer_id: cust.id, type: 'gift_issued',
         points: 0, balance_after: pts, reason: '👑 VIP monthly gift pending', created_by: uid
       });
+      smsGiftPending(cust);
     }
   }
 
@@ -6964,6 +7053,10 @@ function toggleDoublePoints() {
   _doubleActive = !_doubleActive;
   document.getElementById('loy-double-btn').textContent = _doubleActive ? 'ON' : 'OFF';
   document.getElementById('loy-double-btn').className   = 'toggle-pill ' + (_doubleActive ? 'on' : 'off');
+  if(_doubleActive) {
+    smsDoublePoints();
+    notifyDoublePointsActivated();
+  }
 }
 
 async function saveLoyaltySettings() {
