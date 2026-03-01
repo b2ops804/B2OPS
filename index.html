@@ -4827,20 +4827,21 @@ async function createNotification(type, title, body, linkScreen=null, linkId=nul
     created_at: new Date().toISOString(),
   };
 
+  // Always show in-app and send push regardless of DB save
+  S_notifications.unshift({...notif, id: Date.now()});
+  updateNotifBadge();
+  showInAppNotif(notif);
+  sendPushToSubscribers(notif);
+
+  // Try to save to DB (non-blocking)
   try {
     const { data } = await sb.from('notifications').insert(notif).select().single();
     if(data) {
-      S_notifications.unshift(data);
-      updateNotifBadge();
-      showInAppNotif(data);
-      sendPushToSubscribers(data);
+      // Replace the temp in-memory entry with the real one
+      const idx = S_notifications.findIndex(n => n.title === notif.title && n.type === notif.type);
+      if(idx >= 0) S_notifications[idx] = data;
     }
-  } catch(e) {
-    // Fallback — add in-memory only
-    S_notifications.unshift({...notif, id: Date.now()});
-    updateNotifBadge();
-    showInAppNotif(notif);
-  }
+  } catch(e) { /* silent — DB save failure doesn't block notifications */ }
 }
 
 // ── In-app toast-style notification ──
