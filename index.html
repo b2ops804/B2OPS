@@ -393,6 +393,36 @@ textarea.finput{resize:none;min-height:80px}
 
 
 
+
+/* ══ OPERATOR DASHBOARD ══ */
+.op-banner{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #f5c400;border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
+.op-banner-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:#f5c400}
+.op-banner-sub{font-size:10px;letter-spacing:2px;color:#888;font-family:'DM Mono',monospace;margin-top:2px}
+.client-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
+.client-card:active{opacity:.8}
+.client-card.active-today{border-color:var(--grn)}
+.client-card.inactive{border-color:var(--b1);opacity:.7}
+.client-card.suspended{border-color:var(--red)}
+.client-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.client-status.green{background:var(--grn)}
+.client-status.yellow{background:#f5c400}
+.client-status.red{background:var(--red)}
+.client-status.grey{background:var(--t3)}
+.op-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.op-stat{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:12px;text-align:center}
+.op-stat-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--gold)}
+.op-stat-label{font-size:10px;letter-spacing:2px;color:var(--t3);font-family:'DM Mono',monospace;text-transform:uppercase}
+.op-tab-bar{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px}
+.op-tab{flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:11px;font-weight:700;font-family:'Barlow',sans-serif;border:1px solid var(--b1);color:var(--t2);background:none;cursor:pointer}
+.op-tab.active{background:var(--gold);color:#000;border-color:var(--gold)}
+.plan-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;font-family:'DM Mono',monospace;text-transform:uppercase}
+.plan-badge.trial{background:#1a3a5c;color:#60a5fa}
+.plan-badge.paid{background:var(--grdim);color:var(--grn)}
+.plan-badge.free{background:var(--b1);color:var(--t3)}
+.plan-badge.suspended{background:var(--rdim);color:var(--red)}
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:24px}
+.sparkline-bar{flex:1;background:var(--gold);border-radius:2px;min-width:3px;opacity:.7}
+
 /* ══ NOTIFICATIONS ══ */
 .notif-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;transition:opacity .2s}
 .notif-card.unread{border-color:var(--gold);background:var(--gdim)}
@@ -499,6 +529,7 @@ textarea.finput{resize:none;min-height:80px}
     </div>
   </div>
   <div class="body pb-nav">
+    <div id="op-home-banner" style="display:none"></div>
     <div class="stat-strip">
       <div class="stat-tile g"><div class="st-label">Revenue</div><div class="st-val" id="h-rev">$0</div><div class="st-sub">today</div></div>
       <div class="stat-tile gr"><div class="st-label">Units Sold</div><div class="st-val" id="h-units">0</div><div class="st-sub">today</div></div>
@@ -1248,6 +1279,35 @@ textarea.finput{resize:none;min-height:80px}
 <div class="screen" id="screen-deep-discounts"><div class="topbar"><button class="back-btn" onclick="go('metrics')"><span class="back-arrow">←</span> Metrics</button><div class="topbar-title">Discount Intelligence</div><div style="min-width:60px"></div></div><div class="body"><div id="deep-discounts-content"></div></div></div>
 
 <!-- ════════ NOTIFICATIONS ════════ -->
+<!-- ════════════════════════════ OPERATOR DASHBOARD ════════════════════════════ -->
+<div class="screen" id="screen-operator">
+  <div class="topbar">
+    <button class="back-btn" onclick="go('home')"><span class="back-arrow">←</span> Home</button>
+    <div class="topbar-title" style="color:var(--gold)">⚡ B2OPS OPERATOR</div>
+    <div style="min-width:60px"></div>
+  </div>
+  <div class="body">
+    <div class="op-tab-bar">
+      <button class="op-tab active" onclick="opTab('overview',this)">Overview</button>
+      <button class="op-tab" onclick="opTab('clients',this)">Clients</button>
+      <button class="op-tab" onclick="opTab('analytics',this)">Analytics</button>
+      <button class="op-tab" onclick="opTab('announcements',this)">Announce</button>
+      <button class="op-tab" onclick="opTab('billing',this)">Billing</button>
+    </div>
+    <div id="op-content"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ OPERATOR CLIENT DETAIL ════════════════════════════ -->
+<div class="screen" id="screen-operator-client">
+  <div class="topbar">
+    <button class="back-btn" onclick="go('operator')"><span class="back-arrow">←</span> Operator</button>
+    <div class="topbar-title" id="op-client-title">Client</div>
+    <div style="min-width:60px"></div>
+  </div>
+  <div class="body" id="op-client-body"></div>
+</div>
+
 <div class="screen" id="screen-notifications">
   <div class="topbar">
     <button class="back-btn" onclick="go('home')"><span class="back-arrow">←</span> Home</button>
@@ -1703,7 +1763,7 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 
 // Role-based access
 const ROLE_ACCESS = {
-  owner:   ['home','sale','inventory','products','add-product','customers','add-customer','customer-profile','coupons','add-coupon','history','metrics','settings','team','invite-member','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales','deep-customers','deep-inventory','deep-discounts','gen-report','report-customers','report-age','report-new-customers','report-products','report-coupons','loyalty-settings','coupon-triggers','report-archive','report-schedules','report-email-settings','notifications','notification-settings'],
+  owner:   ['home','sale','inventory','products','add-product','customers','add-customer','customer-profile','coupons','add-coupon','history','metrics','settings','team','invite-member','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales','deep-customers','deep-inventory','deep-discounts','gen-report','report-customers','report-age','report-new-customers','report-products','report-coupons','loyalty-settings','coupon-triggers','report-archive','report-schedules','report-email-settings','notifications','notification-settings','operator','operator-client'],
   manager: ['home','sale','inventory','products','customers','customer-profile','history','metrics','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales'],
   staff:   ['home','sale','inventory']
 };
@@ -1784,6 +1844,8 @@ function onScreenLoad(id) {
     'report-email-settings': loadResendConfig,
     'notifications': loadNotifications,
     'notification-settings': loadNotificationSettings,
+    'operator': () => { loadOperatorData().then(renderOpContent); },
+    'operator-client': () => {},
   };
   if(loaders[id]) loaders[id]();
 }
@@ -1916,6 +1978,7 @@ async function loadUserProfile(user) {
   mySessionToken = newToken;
 
   currentProfile = profile;
+  checkOperatorMode();
   // Notify staff login (runs async, doesn't block)
   setTimeout(() => notifyStaffLogin(profile), 2000);
   S.settings.storeName = profile.store_name || 'My Store';
@@ -2065,6 +2128,7 @@ async function dbDelete(table, id) {
 //  HOME
 // ═══════════════════════════════════════════════════
 function renderHome() {
+  checkOperatorMode();
   document.getElementById('home-date').textContent =
     new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   // Dynamic store name — numbers green, letters gold, Bebas Neue, auto-size
@@ -4645,6 +4709,443 @@ async function testResendConfig() {
   }
 }
 
+
+
+
+// ═══════════════════════════════════════════════════
+//  OPERATOR DASHBOARD — Feature 7
+//  Only visible when b2ops804@gmail.com is logged in
+// ═══════════════════════════════════════════════════
+
+const OPERATOR_EMAIL = 'b2ops804@gmail.com';
+let isOperator = false;
+let OP = {
+  clients:       [],
+  allSales:      [],
+  allProfiles:   [],
+  billing:       [],
+  notes:         {},
+  announcements: [],
+  currentTab:    'overview',
+  viewingClient: null,
+};
+
+function checkOperatorMode() {
+  isOperator = currentUser?.email === OPERATOR_EMAIL;
+  const banner = document.getElementById('op-home-banner');
+  if(!banner) return;
+  if(isOperator) {
+    banner.style.display = 'block';
+    banner.innerHTML = `
+      <div class="op-banner" onclick="go('operator')" style="cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="op-banner-title">⚡ OPERATOR MODE</div>
+            <div class="op-banner-sub">TAP TO OPEN OPERATOR DASHBOARD</div>
+          </div>
+          <div style="font-size:28px">→</div>
+        </div>
+      </div>`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── Load all operator data ──
+async function loadOperatorData() {
+  if(!isOperator) return;
+
+  // All profiles (clients)
+  const { data: profiles } = await sb.from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  OP.allProfiles = profiles || [];
+
+  // Group by business_id (owner profiles only)
+  const owners = OP.allProfiles.filter(p => p.role === 'owner' || !p.role);
+  OP.clients = owners;
+
+  // All sales across all businesses
+  const { data: sales } = await sb.from('sales').select('*').order('created_at', { ascending: false }).limit(5000);
+  OP.allSales = sales || [];
+
+  // Billing
+  const { data: billing } = await sb.from('operator_billing').select('*');
+  OP.billing = billing || [];
+
+  // Announcements
+  const { data: ann } = await sb.from('operator_announcements').select('*').order('created_at', { ascending: false }).limit(50);
+  OP.announcements = ann || [];
+}
+
+// ── Tab switcher ──
+function opTab(tab, btn) {
+  OP.currentTab = tab;
+  document.querySelectorAll('.op-tab').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderOpContent();
+}
+
+function renderOpContent() {
+  const el = document.getElementById('op-content');
+  if(!el) return;
+  switch(OP.currentTab) {
+    case 'overview':      el.innerHTML = renderOpOverview(); break;
+    case 'clients':       el.innerHTML = renderOpClients(); break;
+    case 'analytics':     el.innerHTML = renderOpAnalytics(); break;
+    case 'announcements': el.innerHTML = renderOpAnnouncements(); break;
+    case 'billing':       el.innerHTML = renderOpBilling(); break;
+  }
+}
+
+// ── OVERVIEW TAB ──
+function renderOpOverview() {
+  const today = new Date().toISOString().slice(0,10);
+  const thisMonth = today.slice(0,7);
+
+  const totalClients    = OP.clients.length;
+  const activeToday     = OP.clients.filter(c => OP.allSales.some(s => s.business_id == c.id && s.date === today)).length;
+  const newThisMonth    = OP.clients.filter(c => c.created_at?.slice(0,7) === thisMonth).length;
+  const totalSalesToday = OP.allSales.filter(s => s.date === today).reduce((a,s) => a + (s.total||0), 0);
+  const totalTxnsToday  = OP.allSales.filter(s => s.date === today).length;
+  const zeroSales7d     = OP.clients.filter(c => !OP.allSales.some(s => s.business_id == c.id && s.date >= new Date(Date.now()-7*864e5).toISOString().slice(0,10))).length;
+
+  // Most active client
+  const clientRevs = OP.clients.map(c => ({
+    c,
+    rev: OP.allSales.filter(s => s.business_id == c.id && s.date?.slice(0,7) === thisMonth).reduce((a,s) => a+(s.total||0), 0)
+  })).sort((a,b) => b.rev - a.rev);
+  const topClient = clientRevs[0];
+  const riskClient = clientRevs[clientRevs.length-1];
+
+  return `
+    <div class="op-stat-grid">
+      <div class="op-stat"><div class="op-stat-val">${totalClients}</div><div class="op-stat-label">Total Clients</div></div>
+      <div class="op-stat"><div class="op-stat-val">${activeToday}</div><div class="op-stat-label">Active Today</div></div>
+      <div class="op-stat"><div class="op-stat-val">${newThisMonth}</div><div class="op-stat-label">New This Month</div></div>
+      <div class="op-stat"><div class="op-stat-val">${zeroSales7d}</div><div class="op-stat-label">No Sales 7d</div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="row-sub" style="margin-bottom:6px">TODAY PLATFORM-WIDE</div>
+      <div style="display:flex;justify-content:space-between">
+        <div><div style="font-size:22px;font-weight:900;color:var(--grn)">${fmt(totalSalesToday)}</div><div class="row-sub">Revenue</div></div>
+        <div><div style="font-size:22px;font-weight:900;color:var(--gold)">${totalTxnsToday}</div><div class="row-sub">Transactions</div></div>
+      </div>
+    </div>
+    ${topClient?.rev > 0 ? `
+    <div class="card" style="margin-bottom:12px;cursor:pointer" onclick="openOperatorClient('${topClient.c.id}')">
+      <div class="row-sub" style="margin-bottom:4px">🏆 MOST ACTIVE THIS MONTH</div>
+      <div style="font-weight:800">${topClient.c.store_name||topClient.c.email}</div>
+      <div style="color:var(--grn);font-size:13px">${fmt(topClient.rev)} this month</div>
+    </div>` : ''}
+    ${zeroSales7d > 0 ? `
+    <div class="card" style="margin-bottom:12px;border-color:var(--red)">
+      <div class="row-sub" style="margin-bottom:4px">⚠️ CHURN RISK</div>
+      <div style="font-weight:800;color:var(--red)">${zeroSales7d} client${zeroSales7d>1?'s':''} with no sales in 7 days</div>
+      <button class="btn" style="margin-top:8px;font-size:11px" onclick="opTab('clients',null);setTimeout(()=>document.querySelectorAll('.op-tab')[1].click(),10)">View Clients →</button>
+    </div>` : ''}
+    <button class="btn full" style="margin-top:8px" onclick="opTab('clients',document.querySelectorAll('.op-tab')[1])">View All Clients →</button>
+  `;
+}
+
+// ── CLIENTS TAB ──
+function renderOpClients() {
+  if(!OP.clients.length) return '<div class="empty"><div class="empty-icon">👥</div><div class="empty-txt">No clients yet</div></div>';
+
+  const today = new Date().toISOString().slice(0,10);
+  const week  = new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+
+  return OP.clients.map(c => {
+    const billing  = OP.billing.find(b => b.business_id == c.id);
+    const sales    = OP.allSales.filter(s => s.business_id == c.id);
+    const lastSale = sales.sort((a,b) => b.date?.localeCompare(a.date))[0];
+    const activeToday = sales.some(s => s.date === today);
+    const activeWeek  = sales.some(s => s.date >= week);
+    const statusColor = activeToday ? 'green' : activeWeek ? 'yellow' : 'grey';
+    const plan = billing?.plan || 'trial';
+    const team = OP.allProfiles.filter(p => p.business_id == c.id && p.id !== c.id).length;
+    const monthRev = sales.filter(s => s.date?.slice(0,7) === today.slice(0,7)).reduce((a,s) => a+(s.total||0), 0);
+
+    // 30-day sparkline
+    const days30 = [];
+    for(let i=29;i>=0;i--) {
+      const d = new Date(Date.now()-i*864e5).toISOString().slice(0,10);
+      days30.push(sales.filter(s=>s.date===d).reduce((a,s)=>a+(s.total||0),0));
+    }
+    const maxDay = Math.max(...days30, 1);
+    const sparkHTML = `<div class="sparkline">${days30.map(v=>`<div class="sparkline-bar" style="height:${Math.max(2,Math.round((v/maxDay)*24))}px"></div>`).join('')}</div>`;
+
+    return `<div class="client-card ${plan==='suspended'?'suspended':activeToday?'active-today':''}" onclick="openOperatorClient('${c.id}')">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div class="client-status ${statusColor}" style="margin-top:6px"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.store_name||'Unnamed Store'}</div>
+            <span class="plan-badge ${plan}">${plan}</span>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">${c.email}</div>
+          <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--t2)">
+            <span>💰 ${fmt(monthRev)}/mo</span>
+            <span>📦 ${sales.length} sales</span>
+            <span>👥 ${team} staff</span>
+          </div>
+          <div style="margin-top:6px">${sparkHTML}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:4px">Last sale: ${lastSale ? lastSale.date : 'never'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ANALYTICS TAB ──
+function renderOpAnalytics() {
+  const today = new Date().toISOString().slice(0,10);
+  const allCustomers = OP.allProfiles.filter(p => p.role === 'customer' || (!p.role && p.business_id));
+  const totalPlatformRev = OP.allSales.reduce((a,s) => a+(s.total||0), 0);
+  const monthRev = OP.allSales.filter(s => s.date?.slice(0,7) === today.slice(0,7)).reduce((a,s) => a+(s.total||0), 0);
+
+  // Growth chart — client count per month (last 6 months)
+  const months = [];
+  for(let i=5;i>=0;i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i);
+    const ym = d.toISOString().slice(0,7);
+    const label = d.toLocaleDateString('en-US',{month:'short'});
+    const count = OP.clients.filter(c => c.created_at?.slice(0,7) <= ym).length;
+    months.push({label, count});
+  }
+  const maxClients = Math.max(...months.map(m=>m.count), 1);
+  const growthChart = `<div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-top:8px">
+    ${months.map(m=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="flex:1;display:flex;align-items:flex-end;width:100%">
+        <div style="width:100%;background:var(--gold);border-radius:3px 3px 0 0;height:${Math.max(4,Math.round((m.count/maxClients)*52))}px;opacity:.8"></div>
+      </div>
+      <div style="font-size:8px;color:var(--t3);font-family:'DM Mono',monospace">${m.label}</div>
+    </div>`).join('')}
+  </div>`;
+
+  const incomplete = OP.clients.filter(c => {
+    const hasSales = OP.allSales.some(s => s.business_id == c.id);
+    return !hasSales;
+  }).length;
+
+  return `
+    <div class="sec" style="margin-top:0">Platform Revenue</div>
+    <div class="op-stat-grid">
+      <div class="op-stat"><div class="op-stat-val">${fmt(monthRev)}</div><div class="op-stat-label">This Month</div></div>
+      <div class="op-stat"><div class="op-stat-val">${fmt(totalPlatformRev)}</div><div class="op-stat-label">All Time</div></div>
+    </div>
+    <div class="sec">Client Growth</div>
+    <div class="card">
+      <div class="row-sub" style="margin-bottom:4px">CLIENT COUNT — LAST 6 MONTHS</div>
+      ${growthChart}
+    </div>
+    <div class="sec">Setup Health</div>
+    <div class="op-stat-grid">
+      <div class="op-stat"><div class="op-stat-val">${OP.clients.length - incomplete}</div><div class="op-stat-label">Setup Complete</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="color:var(--red)">${incomplete}</div><div class="op-stat-label">No Sales Yet</div></div>
+    </div>
+  `;
+}
+
+// ── ANNOUNCEMENTS TAB ──
+function renderOpAnnouncements() {
+  return `
+    <button class="btn fill-gold full bebas" onclick="openNewAnnouncement()">+ New Announcement</button>
+    <div style="height:12px"></div>
+    ${OP.announcements.length ? OP.announcements.map(a => `
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-weight:800;font-size:14px">${a.title}</div>
+          <div style="font-size:9px;color:var(--t3);font-family:'DM Mono',monospace">${a.created_at?.slice(0,10)}</div>
+        </div>
+        <div style="font-size:12px;color:var(--t2);margin-bottom:6px">${a.body}</div>
+        <div style="font-size:10px;color:var(--t3)">Target: ${a.target === 'all' ? 'All Clients' : a.target} · ${a.sent ? '✓ Sent' : '⏳ Pending'}</div>
+      </div>`).join('') : '<div class="empty"><div class="empty-txt">No announcements yet</div></div>'}
+  `;
+}
+
+function openNewAnnouncement() {
+  const title  = prompt('Announcement title:');
+  if(!title) return;
+  const body   = prompt('Message body:');
+  if(!body) return;
+  const target = prompt('Target (type "all" or a specific business_id):') || 'all';
+  saveAnnouncement(title, body, target);
+}
+
+async function saveAnnouncement(title, body, target) {
+  showLoading('Saving...');
+  await sb.from('operator_announcements').insert({ title, body, target });
+  await loadOperatorData();
+  hideLoading();
+  renderOpContent();
+  toast('✓ Announcement saved');
+}
+
+// ── BILLING TAB ──
+function renderOpBilling() {
+  return `
+    <div class="sec" style="margin-top:0">Client Plans</div>
+    ${OP.clients.map(c => {
+      const b = OP.billing.find(x => x.business_id == c.id) || {};
+      return `<div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:800">${c.store_name||c.email}</div>
+          <span class="plan-badge ${b.plan||'trial'}">${b.plan||'trial'}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--t2)">Payment: <b style="color:${b.payment_status==='paid'?'var(--grn)':b.payment_status==='overdue'?'var(--red)':'var(--t2)'}">${b.payment_status||'pending'}</b></span>
+          ${b.trial_expires ? `<span style="font-size:11px;color:var(--t2)">Trial expires: ${b.trial_expires}</span>` : ''}
+          ${b.monthly_revenue ? `<span style="font-size:11px;color:var(--grn)">${fmt(b.monthly_revenue)}/mo</span>` : ''}
+        </div>
+        <button class="btn" style="font-size:11px;padding:6px 12px" onclick="editClientBilling('${c.id}')">Edit Billing</button>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+async function editClientBilling(clientId) {
+  const client = OP.clients.find(c => c.id == clientId);
+  const existing = OP.billing.find(b => b.business_id == clientId) || {};
+  const plan = prompt('Plan (free/trial/paid/suspended):', existing.plan||'trial');
+  if(!plan) return;
+  const payment = prompt('Payment status (paid/overdue/pending):', existing.payment_status||'pending');
+  const revenue = prompt('Monthly revenue ($):', existing.monthly_revenue||0);
+  const trialExp = prompt('Trial expiry date (YYYY-MM-DD or blank):', existing.trial_expires||'');
+
+  showLoading('Saving...');
+  const data = {
+    business_id: String(clientId),
+    plan,
+    payment_status: payment||'pending',
+    monthly_revenue: parseFloat(revenue)||0,
+    trial_expires: trialExp||null,
+    updated_at: new Date().toISOString(),
+  };
+  if(existing.id) {
+    await sb.from('operator_billing').update(data).eq('id', existing.id);
+  } else {
+    await sb.from('operator_billing').insert(data);
+  }
+  await loadOperatorData();
+  hideLoading();
+  renderOpContent();
+  toast('✓ Billing updated');
+}
+
+// ── CLIENT DETAIL ──
+async function openOperatorClient(clientId) {
+  OP.viewingClient = clientId;
+  const client  = OP.clients.find(c => c.id == clientId);
+  const sales   = OP.allSales.filter(s => s.business_id == clientId);
+  const team    = OP.allProfiles.filter(p => p.business_id == clientId && p.id != clientId);
+  const billing = OP.billing.find(b => b.business_id == clientId) || {};
+
+  // Load notes for this client
+  const { data: notes } = await sb.from('operator_notes').select('*').eq('business_id', String(clientId)).order('created_at', {ascending:false});
+  OP.notes[clientId] = notes || [];
+
+  document.getElementById('op-client-title').textContent = client?.store_name || client?.email || 'Client';
+
+  const today = new Date().toISOString().slice(0,10);
+  const monthRev = sales.filter(s => s.date?.slice(0,7) === today.slice(0,7)).reduce((a,s) => a+(s.total||0), 0);
+  const totalRev  = sales.reduce((a,s) => a+(s.total||0), 0);
+  const lastSale  = sales.sort((a,b) => b.date?.localeCompare(a.date))[0];
+  const daysSince = lastSale ? Math.floor((Date.now()-new Date(lastSale.date))/864e5) : null;
+
+  document.getElementById('op-client-body').innerHTML = `
+    <div class="op-stat-grid">
+      <div class="op-stat"><div class="op-stat-val">${fmt(monthRev)}</div><div class="op-stat-label">This Month</div></div>
+      <div class="op-stat"><div class="op-stat-val">${fmt(totalRev)}</div><div class="op-stat-label">All Time</div></div>
+      <div class="op-stat"><div class="op-stat-val">${sales.length}</div><div class="op-stat-label">Total Sales</div></div>
+      <div class="op-stat"><div class="op-stat-val">${daysSince !== null ? daysSince+'d' : '—'}</div><div class="op-stat-label">Since Last Sale</div></div>
+    </div>
+
+    <div class="sec">Client Info</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:12px;color:var(--t2);line-height:1.8">
+        <div><b>Email:</b> ${client?.email}</div>
+        <div><b>Owner:</b> ${client?.owner_name||'—'}</div>
+        <div><b>Joined:</b> ${client?.created_at?.slice(0,10)||'—'}</div>
+        <div><b>Plan:</b> <span class="plan-badge ${billing.plan||'trial'}">${billing.plan||'trial'}</span></div>
+        <div><b>Team members:</b> ${team.length}</div>
+      </div>
+    </div>
+
+    <div class="sec">Actions</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <button class="btn" style="font-size:11px" onclick="opForceSignOut('${clientId}')">Force Sign Out</button>
+      <button class="btn" style="font-size:11px" onclick="editClientBilling('${clientId}')">Edit Billing</button>
+      <button class="btn" style="font-size:11px" onclick="opSendAnnouncement('${clientId}')">Send Message</button>
+      <button class="btn red" style="font-size:11px" onclick="opSuspendClient('${clientId}')">Suspend</button>
+    </div>
+
+    <div class="sec">Operator Notes</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input class="finput" id="op-note-input" placeholder="Add a note..." style="flex:1"/>
+      <button class="btn gold" style="padding:8px 14px;font-size:12px" onclick="addOpNote('${clientId}')">Add</button>
+    </div>
+    <div id="op-notes-list">
+      ${(OP.notes[clientId]||[]).map(n => `
+        <div class="card" style="margin-bottom:8px;padding:10px 12px">
+          <div style="font-size:12px;color:var(--t1)">${n.note}</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:4px;font-family:'DM Mono',monospace">${n.created_at?.slice(0,16)}</div>
+        </div>`).join('') || '<div style="font-size:12px;color:var(--t3)">No notes yet</div>'}
+    </div>
+
+    <div class="sec">Recent Sales (last 10)</div>
+    ${sales.slice(0,10).map(s => `
+      <div class="card" style="margin-bottom:8px;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between">
+          <div style="font-size:13px;font-weight:700">${s.product_name||'Sale'}</div>
+          <div style="color:var(--grn);font-weight:800">${fmt(s.total)}</div>
+        </div>
+        <div style="font-size:10px;color:var(--t3)">${s.date} ${s.time||''}</div>
+      </div>`).join('') || '<div style="font-size:12px;color:var(--t3)">No sales yet</div>'}
+  `;
+
+  go('operator-client');
+}
+
+async function addOpNote(clientId) {
+  const note = document.getElementById('op-note-input')?.value.trim();
+  if(!note) return;
+  await sb.from('operator_notes').insert({ business_id: String(clientId), note });
+  toast('✓ Note saved');
+  openOperatorClient(clientId);
+}
+
+async function opForceSignOut(clientId) {
+  if(!confirm('Force sign out all sessions for this client?')) return;
+  showLoading('Forcing sign out...');
+  await sb.from('profiles').update({ session_token: null }).eq('business_id', String(clientId));
+  hideLoading();
+  toast('✓ Sessions cleared');
+}
+
+async function opSuspendClient(clientId) {
+  if(!confirm('Suspend this client account?')) return;
+  showLoading('Suspending...');
+  const existing = OP.billing.find(b => b.business_id == clientId);
+  if(existing) {
+    await sb.from('operator_billing').update({ plan: 'suspended', updated_at: new Date().toISOString() }).eq('id', existing.id);
+  } else {
+    await sb.from('operator_billing').insert({ business_id: String(clientId), plan: 'suspended' });
+  }
+  await loadOperatorData();
+  hideLoading();
+  toast('Account suspended');
+  go('operator');
+}
+
+async function opSendAnnouncement(clientId) {
+  const client = OP.clients.find(c => c.id == clientId);
+  const title = prompt('Message title:');
+  if(!title) return;
+  const body = prompt('Message:');
+  if(!body) return;
+  await saveAnnouncement(title, body, String(clientId));
+}
 
 
 // ═══════════════════════════════════════════════════
