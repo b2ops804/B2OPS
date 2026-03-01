@@ -394,6 +394,27 @@ textarea.finput{resize:none;min-height:80px}
 
 
 
+
+/* ══ SMS / TWILIO ══ */
+.sms-tab-bar{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px}
+.sms-tab{flex-shrink:0;padding:6px 14px;border-radius:100px;font-size:11px;font-weight:700;font-family:'Barlow',sans-serif;border:1px solid var(--b1);color:var(--t2);background:none;cursor:pointer}
+.sms-tab.active{background:var(--gold);color:#000;border-color:var(--gold)}
+.sms-feature-row{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.sms-feature-row.high-risk{border-color:#f59e0b}
+.sms-feature-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sms-feature-title{font-weight:800;font-size:13px}
+.sms-feature-sub{font-size:11px;color:var(--t2);margin-bottom:8px}
+.caution-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;background:#422006;color:#f59e0b;font-family:'DM Mono',monospace}
+.sms-template-box{background:var(--bg);border:1px solid var(--b1);border-radius:6px;padding:10px;font-size:11px;color:var(--t2);font-family:'DM Mono',monospace;width:100%;box-sizing:border-box;resize:vertical;min-height:60px}
+.sms-opt-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--b1)}
+.sms-opt-row:last-child{border-bottom:none}
+.opt-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;font-family:'DM Mono',monospace}
+.opt-badge.confirmed{background:var(--grdim);color:var(--grn)}
+.opt-badge.pending{background:#1a3a5c;color:#60a5fa}
+.opt-badge.opted_out{background:var(--rdim);color:var(--red)}
+.sms-log-row{padding:10px 0;border-bottom:1px solid var(--b1);font-size:12px}
+.sms-log-row:last-child{border-bottom:none}
+
 /* ══ OPERATOR DASHBOARD ══ */
 .op-banner{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #f5c400;border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
 .op-banner-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;color:#f5c400}
@@ -1280,6 +1301,25 @@ textarea.finput{resize:none;min-height:80px}
 
 <!-- ════════ NOTIFICATIONS ════════ -->
 <!-- ════════════════════════════ OPERATOR DASHBOARD ════════════════════════════ -->
+<!-- ════════════════════════════ SMS / TWILIO ════════════════════════════ -->
+<div class="screen" id="screen-sms">
+  <div class="topbar">
+    <button class="back-btn" onclick="go('settings')"><span class="back-arrow">←</span> Settings</button>
+    <div class="topbar-title">SMS</div>
+    <button class="topbar-right" onclick="saveSmsSettings()">Save</button>
+  </div>
+  <div class="body">
+    <div class="sms-tab-bar">
+      <button class="sms-tab active" onclick="smsTab('setup',this)">Setup</button>
+      <button class="sms-tab" onclick="smsTab('alerts',this)">Alerts</button>
+      <button class="sms-tab" onclick="smsTab('customers',this)">Customers</button>
+      <button class="sms-tab" onclick="smsTab('optins',this)">Opt-Ins</button>
+      <button class="sms-tab" onclick="smsTab('log',this)">Log</button>
+    </div>
+    <div id="sms-content"></div>
+  </div>
+</div>
+
 <div class="screen" id="screen-operator">
   <div class="topbar">
     <button class="back-btn" onclick="go('home')"><span class="back-arrow">←</span> Home</button>
@@ -1359,6 +1399,9 @@ textarea.finput{resize:none;min-height:80px}
     <div class="divider"></div>
     <div class="sec">Notifications</div>
     <button class="btn full" onclick="go('notification-settings')" style="text-align:left;display:flex;align-items:center;gap:10px;padding:14px 16px"><span style="font-size:20px">🔔</span><span>Notification Settings</span><span style="margin-left:auto;color:var(--gold)">→</span></button>
+    <div class="divider"></div>
+    <div class="sec">SMS</div>
+    <button class="btn full" onclick="go('sms')" style="text-align:left;display:flex;align-items:center;gap:10px;padding:14px 16px"><span style="font-size:20px">💬</span><span>SMS / Twilio</span><span style="margin-left:auto;color:var(--gold)">→</span></button>
     <div class="divider"></div>
     <div class="sec">Team</div>
     <button class="btn full" id="settings-team-btn" onclick="go('team')" style="text-align:left;display:flex;align-items:center;gap:10px;padding:14px 16px"><span style="font-size:20px">👥</span><span>Manage Team Members</span><span style="margin-left:auto;color:var(--gold)">→</span></button>
@@ -1763,7 +1806,7 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 
 // Role-based access
 const ROLE_ACCESS = {
-  owner:   ['home','sale','inventory','products','add-product','customers','add-customer','customer-profile','coupons','add-coupon','history','metrics','settings','team','invite-member','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales','deep-customers','deep-inventory','deep-discounts','gen-report','report-customers','report-age','report-new-customers','report-products','report-coupons','loyalty-settings','coupon-triggers','report-archive','report-schedules','report-email-settings','notifications','notification-settings','operator','operator-client'],
+  owner:   ['home','sale','inventory','products','add-product','customers','add-customer','customer-profile','coupons','add-coupon','history','metrics','settings','team','invite-member','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales','deep-customers','deep-inventory','deep-discounts','gen-report','report-customers','report-age','report-new-customers','report-products','report-coupons','loyalty-settings','coupon-triggers','report-archive','report-schedules','report-email-settings','notifications','notification-settings','operator','operator-client','sms'],
   manager: ['home','sale','inventory','products','customers','customer-profile','history','metrics','glance-customers','glance-products','glance-velocity','glance-deadstock','deep-sales'],
   staff:   ['home','sale','inventory']
 };
@@ -1845,6 +1888,7 @@ function onScreenLoad(id) {
     'notifications': loadNotifications,
     'notification-settings': loadNotificationSettings,
     'operator': () => { loadOperatorData().then(renderOpContent); },
+    'sms': () => { loadSmsData().then(renderSmsContent); },
     'operator-client': () => {},
   };
   if(loaders[id]) loaders[id]();
@@ -2082,6 +2126,12 @@ async function refreshAllData() {
   try {
     const nsRes = await sb.from('notification_settings').select('*').eq('business_id', bid).maybeSingle();
     S_notifSettings = nsRes.data || null;
+    const [smsCfgRes, smsSetRes] = await Promise.all([
+      sb.from('twilio_config').select('*').eq('business_id', bid).maybeSingle(),
+      sb.from('sms_settings').select('*').eq('business_id', bid).maybeSingle(),
+    ]);
+    S_twilioConfig = smsCfgRes.data || {};
+    S_smsSettings  = smsSetRes.data || {};
   } catch(e) { S_notifSettings = null; }
   // Update notification badge
   updateNotifBadge();
@@ -4713,6 +4763,587 @@ async function testResendConfig() {
 
 
 // ═══════════════════════════════════════════════════
+//  SMS / TWILIO — Feature 6
+// ═══════════════════════════════════════════════════
+
+let S_smsSettings  = null;
+let S_twilioConfig = null;
+let S_smsOptIns    = [];
+let S_smsLog       = [];
+let S_smsTab       = 'setup';
+
+async function loadSmsData() {
+  const bid = String(bizId());
+  const [cfgRes, setRes, optRes, logRes] = await Promise.all([
+    sb.from('twilio_config').select('*').eq('business_id', bid).maybeSingle(),
+    sb.from('sms_settings').select('*').eq('business_id', bid).maybeSingle(),
+    sb.from('sms_opt_ins').select('*').eq('business_id', bid).order('created_at', {ascending:false}),
+    sb.from('sms_log').select('*').eq('business_id', bid).order('created_at', {ascending:false}).limit(100),
+  ]);
+  S_twilioConfig = cfgRes.data || {};
+  S_smsSettings  = setRes.data || {};
+  S_smsOptIns    = optRes.data || [];
+  S_smsLog       = logRes.data || [];
+}
+
+function smsTab(tab, btn) {
+  S_smsTab = tab;
+  document.querySelectorAll('.sms-tab').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderSmsContent();
+}
+
+function renderSmsContent() {
+  const el = document.getElementById('sms-content');
+  if(!el) return;
+  switch(S_smsTab) {
+    case 'setup':     el.innerHTML = renderSmsSetup();     break;
+    case 'alerts':    el.innerHTML = renderSmsAlerts();    break;
+    case 'customers': el.innerHTML = renderSmsCustomers(); break;
+    case 'optins':    el.innerHTML = renderSmsOptIns();    break;
+    case 'log':       el.innerHTML = renderSmsLog();       break;
+  }
+}
+
+// ── SETUP TAB ──
+function renderSmsSetup() {
+  const cfg = S_twilioConfig || {};
+  const s   = S_smsSettings  || {};
+  const verified = cfg.verified;
+  return `
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:800;font-size:14px">Twilio Credentials</div>
+        ${verified ? '<span style="font-size:10px;color:var(--grn);font-weight:700">✓ VERIFIED</span>' : '<span style="font-size:10px;color:var(--t3)">NOT VERIFIED</span>'}
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Account SID</label>
+        <input class="finput" id="tw-sid" value="${cfg.account_sid||''}" placeholder="ACxxxxxxxxx" autocomplete="off"/>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Auth Token</label>
+        <input class="finput" id="tw-token" value="${cfg.auth_token||''}" placeholder="Your auth token" type="password" autocomplete="off"/>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Twilio Phone Number</label>
+        <input class="finput" id="tw-phone" value="${cfg.phone_number||''}" placeholder="+1xxxxxxxxxx"/>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn" style="flex:1;font-size:12px" onclick="saveTwilioConfig()">Save Credentials</button>
+        <button class="btn gold" style="flex:1;font-size:12px" onclick="testTwilioConnection()">Test Connection</button>
+      </div>
+    </div>
+
+    <div class="sms-feature-row">
+      <div class="sms-feature-header">
+        <div>
+          <div class="sms-feature-title">Master SMS Toggle</div>
+          <div class="sms-feature-sub">Turn all SMS on or off globally</div>
+        </div>
+        <button class="toggle-pill ${cfg.master_enabled ? 'on' : 'off'}" onclick="toggleSmsMaster(this)">${cfg.master_enabled ? 'ON' : 'OFF'}</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;border-color:#f59e0b">
+      <div style="font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px">⚠️ CANNABIS SMS NOTICE</div>
+      <div style="font-size:11px;color:var(--t2);line-height:1.6">Twilio prohibits promotional cannabis messages on standard long codes. For customer-facing SMS, use a toll-free number with TCR registration (~$2/month). Internal/transactional messages are generally fine. Contact Twilio support to confirm your use case before launching.</div>
+    </div>
+  `;
+}
+
+// ── ALERTS TAB (owner/staff operational) ──
+function renderSmsAlerts() {
+  const s = S_smsSettings || {};
+  const stog = (key, label, sub) => `
+    <div class="sms-feature-row">
+      <div class="sms-feature-header">
+        <div><div class="sms-feature-title">${label}</div>${sub?`<div class="sms-feature-sub">${sub}</div>`:''}
+        </div>
+        <button class="toggle-pill ${s[key] ? 'on' : 'off'}" onclick="toggleSms('${key}',this)">${s[key] ? 'ON' : 'OFF'}</button>
+      </div>
+    </div>`;
+
+  return `
+    ${stog('low_stock','Low Stock Alert','Fires when product hits threshold')}
+    ${stog('out_of_stock','Out of Stock Alert','Product hits zero')}
+    ${stog('dead_stock','Dead Stock Alert','No sales in 30 days')}
+    ${stog('large_sale','Large Sale Alert','')}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Large Sale Threshold ($)</label>
+      <input class="finput" id="sms-large-threshold" value="${s.large_sale_threshold||200}" type="number"/>
+    </div>
+    ${stog('high_discount','High Discount Alert','')}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Discount Threshold (%)</label>
+      <input class="finput" id="sms-discount-threshold" value="${s.high_discount_threshold||20}" type="number"/>
+    </div>
+    ${stog('daily_summary','Daily Sales Summary','')}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Send Time</label>
+      <input class="finput" id="sms-summary-time" value="${s.daily_summary_time||'20:00'}" type="time"/>
+    </div>
+    ${stog('weekly_report','Weekly Revenue Report','')}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Send Day</label>
+      <select class="finput" id="sms-weekly-day">
+        ${['monday','tuesday','wednesday','thursday','friday','saturday','sunday'].map(d=>`<option value="${d}" ${s.weekly_report_day===d?'selected':''}>${d.charAt(0).toUpperCase()+d.slice(1)}</option>`).join('')}
+      </select>
+    </div>
+    ${stog('monthly_summary','Monthly Performance Summary','Sends at month end')}
+    ${stog('new_member_login','New Team Member First Login','')}
+    ${stog('unusual_login','Unusual Login Alert','New device or atypical time')}
+    ${stog('restock_reminder','Scheduled Restock Reminder','')}
+    ${stog('points_expiring_alert','Points Expiring Alert','Customers within 30 days of 90-day inactivity window')}
+    <button class="btn fill-gold full bebas" style="margin-top:8px" onclick="saveSmsSettings()">Save Alerts Settings</button>
+  `;
+}
+
+// ── CUSTOMERS TAB ──
+function renderSmsCustomers() {
+  const s = S_smsSettings || {};
+  const confirmedCount = S_smsOptIns.filter(o => o.status === 'confirmed').length;
+
+  const ctog = (key, label, sub, template_key, high_risk) => `
+    <div class="sms-feature-row ${high_risk ? 'high-risk' : ''}">
+      <div class="sms-feature-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="sms-feature-title">${label}</div>
+            ${high_risk ? '<span class="caution-badge">⚠️ HIGH RISK</span>' : ''}
+          </div>
+          ${sub ? `<div class="sms-feature-sub">${sub}</div>` : ''}
+        </div>
+        <button class="toggle-pill ${s[key] ? 'on' : 'off'}" onclick="toggleSms('${key}',this)">${s[key] ? 'ON' : 'OFF'}</button>
+      </div>
+      ${template_key ? `<textarea class="sms-template-box" id="sms-tmpl-${template_key}" placeholder="Message template...">${s[template_key]||''}</textarea>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">Variables: {name} {store} {points} {message}</div>` : ''}
+    </div>`;
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:12px;color:var(--t2)">📲 <b style="color:var(--t1)">${confirmedCount}</b> opted-in customers · <span onclick="smsTab('optins',document.querySelectorAll('.sms-tab')[3])" style="color:var(--gold);cursor:pointer">Manage opt-ins →</span></div>
+    </div>
+
+    ${ctog('birthday_sms','Birthday Greeting','Sends in birthday month','birthday_template',false)}
+    ${ctog('points_milestone','Points Milestone',`Fires when customer hits threshold`,'points_milestone_template',false)}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Points Threshold</label>
+      <input class="finput" id="sms-pts-threshold" value="${s.points_milestone_threshold||500}" type="number"/>
+    </div>
+    ${ctog('promo_blast','Promotional Blast','Send manually to all or filtered customers','promo_blast_template',true)}
+    <button class="btn gold" style="margin:-4px 0 10px;font-size:12px" onclick="openPromoBlast()">📤 Send Blast Now</button>
+    ${ctog('win_back','Win-Back Message','Automated — fires after inactivity window','win_back_template',false)}
+    <div class="fgroup" style="margin:-4px 0 8px">
+      <label class="flabel">Inactivity Window (days)</label>
+      <input class="finput" id="sms-winback-days" value="${s.win_back_days||45}" type="number"/>
+    </div>
+    ${ctog('gift_pending','VIP Gift Pending','Fires when gift pending tag applied','gift_pending_template',false)}
+    ${ctog('double_points_sms','Double Points Announcement','Fires when double points activated','double_points_template',false)}
+    ${ctog('new_product_sms','New Product Announcement','Send manually','new_product_template',true)}
+    <button class="btn" style="margin:-4px 0 10px;font-size:12px" onclick="openNewProductBlast()">📤 Send Now</button>
+
+    <button class="btn fill-gold full bebas" style="margin-top:8px" onclick="saveSmsSettings()">Save Customer Settings</button>
+  `;
+}
+
+// ── OPT-INS TAB ──
+function renderSmsOptIns() {
+  const confirmed = S_smsOptIns.filter(o => o.status === 'confirmed');
+  const pending   = S_smsOptIns.filter(o => o.status === 'pending');
+  const optedOut  = S_smsOptIns.filter(o => o.status === 'opted_out');
+
+  const custName = id => {
+    const c = S.customers?.find(x => x.id == id);
+    return c ? (c.first_name + ' ' + (c.last_name||'')).trim() : 'Unknown';
+  };
+
+  return `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:var(--grn)">${confirmed.length}</div><div class="op-stat-label">Confirmed</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:#60a5fa">${pending.length}</div><div class="op-stat-label">Pending</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:var(--red)">${optedOut.length}</div><div class="op-stat-label">Opted Out</div></div>
+    </div>
+
+    <div class="sec" style="margin-top:0">Opt-In List</div>
+    ${S_smsOptIns.length ? `
+      <div class="card">
+        ${S_smsOptIns.map(o => `
+          <div class="sms-opt-row">
+            <div>
+              <div style="font-weight:700;font-size:13px">${custName(o.customer_id)}</div>
+              <div style="font-size:11px;color:var(--t3)">${o.phone}</div>
+            </div>
+            <span class="opt-badge ${o.status}">${o.status === 'opted_out' ? 'Opted Out' : o.status.charAt(0).toUpperCase()+o.status.slice(1)}</span>
+          </div>`).join('')}
+      </div>` : '<div class="empty"><div class="empty-txt">No opt-ins yet</div></div>'}
+
+    <div class="sec">Add Manual Opt-In</div>
+    <div class="card">
+      <div class="fgroup">
+        <label class="flabel">Customer</label>
+        <select class="finput" id="optin-customer">
+          <option value="">Select customer...</option>
+          ${(S.customers||[]).map(c => `<option value="${c.id}">${c.first_name} ${c.last_name||''} — ${c.phone||'no phone'}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Phone Number</label>
+        <input class="finput" id="optin-phone" placeholder="+1xxxxxxxxxx"/>
+      </div>
+      <button class="btn fill-gold full bebas" onclick="sendOptIn()">Send Opt-In Confirmation</button>
+    </div>
+  `;
+}
+
+// ── LOG TAB ──
+function renderSmsLog() {
+  if(!S_smsLog.length) return '<div class="empty"><div class="empty-icon">📋</div><div class="empty-txt">No messages sent yet</div></div>';
+  return `
+    <div class="card">
+      ${S_smsLog.map(l => `
+        <div class="sms-log-row">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+            <div style="font-weight:700;font-size:11px">${l.type}</div>
+            <div style="font-size:9px;color:${l.status==='sent'?'var(--grn)':'var(--red)'};font-weight:700">${l.status?.toUpperCase()}</div>
+          </div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:2px">${l.message?.slice(0,80)}${l.message?.length>80?'...':''}</div>
+          <div style="font-size:9px;color:var(--t3)">${l.to_phone} · ${l.created_at?.slice(0,16)}</div>
+          ${l.error ? `<div style="font-size:9px;color:var(--red);margin-top:2px">${l.error}</div>` : ''}
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+// ── SAVE / TOGGLE ──
+function toggleSms(key, btn) {
+  const isOn = btn.textContent.trim() === 'ON';
+  btn.textContent = isOn ? 'OFF' : 'ON';
+  btn.className = `toggle-pill ${isOn ? 'off' : 'on'}`;
+  if(!S_smsSettings) S_smsSettings = {};
+  S_smsSettings[key] = !isOn;
+}
+
+function toggleSmsMaster(btn) {
+  const isOn = btn.textContent.trim() === 'ON';
+  btn.textContent = isOn ? 'OFF' : 'ON';
+  btn.className = `toggle-pill ${isOn ? 'off' : 'on'}`;
+  if(!S_twilioConfig) S_twilioConfig = {};
+  S_twilioConfig.master_enabled = !isOn;
+  saveTwilioConfig();
+}
+
+async function saveTwilioConfig() {
+  const sid   = document.getElementById('tw-sid')?.value.trim();
+  const token = document.getElementById('tw-token')?.value.trim();
+  const phone = document.getElementById('tw-phone')?.value.trim();
+  const bid = String(bizId());
+  const data = {
+    business_id: bid,
+    account_sid:   sid   || S_twilioConfig?.account_sid   || null,
+    auth_token:    token || S_twilioConfig?.auth_token     || null,
+    phone_number:  phone || S_twilioConfig?.phone_number   || null,
+    master_enabled: S_twilioConfig?.master_enabled || false,
+    updated_at: new Date().toISOString(),
+  };
+  if(S_twilioConfig?.id) {
+    await sb.from('twilio_config').update(data).eq('id', S_twilioConfig.id);
+  } else {
+    const { data: row } = await sb.from('twilio_config').insert(data).select().single();
+    if(row) S_twilioConfig = row;
+  }
+  toast('✓ Twilio credentials saved');
+}
+
+async function testTwilioConnection() {
+  showLoading('Testing...');
+  const bid = String(bizId());
+  const phone = currentUser?.phone || prompt('Enter a phone number to send test SMS to:');
+  if(!phone) { hideLoading(); return; }
+  const res = await callSmsEdge({ action: 'send', business_id: bid, to: phone, message: 'B2OPS: Twilio connection test successful! ✓', type: 'test' });
+  hideLoading();
+  if(res.ok) {
+    S_twilioConfig.verified = true;
+    await sb.from('twilio_config').update({ verified: true }).eq('business_id', bid);
+    toast('✓ Test SMS sent! Twilio verified.');
+    renderSmsContent();
+  } else {
+    toast('Test failed: ' + (res.error || 'Unknown error'), 'err');
+  }
+}
+
+async function saveSmsSettings() {
+  const s = S_smsSettings || {};
+  const gv = id => document.getElementById(id)?.value;
+  const gtmpl = key => document.getElementById('sms-tmpl-'+key)?.value || s[key] || '';
+  const data = {
+    business_id: String(bizId()),
+    low_stock: s.low_stock || false,
+    out_of_stock: s.out_of_stock || false,
+    dead_stock: s.dead_stock || false,
+    large_sale: s.large_sale || false,
+    large_sale_threshold: parseFloat(gv('sms-large-threshold')) || 200,
+    high_discount: s.high_discount || false,
+    high_discount_threshold: parseFloat(gv('sms-discount-threshold')) || 20,
+    daily_summary: s.daily_summary || false,
+    daily_summary_time: gv('sms-summary-time') || '20:00',
+    weekly_report: s.weekly_report || false,
+    weekly_report_day: gv('sms-weekly-day') || 'monday',
+    monthly_summary: s.monthly_summary || false,
+    new_member_login: s.new_member_login || false,
+    unusual_login: s.unusual_login || false,
+    restock_reminder: s.restock_reminder || false,
+    points_expiring_alert: s.points_expiring_alert || false,
+    birthday_sms: s.birthday_sms || false,
+    birthday_template: gtmpl('birthday_template'),
+    points_milestone: s.points_milestone || false,
+    points_milestone_threshold: parseFloat(gv('sms-pts-threshold')) || 500,
+    points_milestone_template: gtmpl('points_milestone_template'),
+    promo_blast: s.promo_blast || false,
+    promo_blast_template: gtmpl('promo_blast_template'),
+    win_back: s.win_back || false,
+    win_back_days: parseInt(gv('sms-winback-days')) || 45,
+    win_back_template: gtmpl('win_back_template'),
+    gift_pending: s.gift_pending || false,
+    gift_pending_template: gtmpl('gift_pending_template'),
+    double_points_sms: s.double_points_sms || false,
+    double_points_template: gtmpl('double_points_template'),
+    new_product_sms: s.new_product_sms || false,
+    new_product_template: gtmpl('new_product_template'),
+    updated_at: new Date().toISOString(),
+  };
+  showLoading('Saving...');
+  if(S_smsSettings?.id) {
+    await sb.from('sms_settings').update(data).eq('id', S_smsSettings.id);
+  } else {
+    const { data: row } = await sb.from('sms_settings').insert(data).select().single();
+    if(row) S_smsSettings = row;
+  }
+  hideLoading();
+  toast('✓ SMS settings saved');
+}
+
+// ── SMS EDGE FUNCTION CALLER ──
+async function callSmsEdge(payload) {
+  try {
+    const res = await fetch(`${SUPA_URL}/functions/v1/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch(e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+// ── TEMPLATE SUBSTITUTION ──
+function smsTemplate(template, vars) {
+  return template
+    .replace(/{name}/g,    vars.name    || '')
+    .replace(/{store}/g,   vars.store   || S.settings?.storeName || '')
+    .replace(/{points}/g,  vars.points  || '')
+    .replace(/{message}/g, vars.message || '');
+}
+
+// ── OPT-IN ──
+async function sendOptIn() {
+  const customerId = document.getElementById('optin-customer')?.value;
+  const phone      = document.getElementById('optin-phone')?.value.trim() ||
+    S.customers?.find(c => c.id == customerId)?.phone;
+  if(!phone) { toast('Enter a phone number','err'); return; }
+  showLoading('Sending opt-in...');
+  const res = await callSmsEdge({ action: 'optin', business_id: String(bizId()), customer_id: customerId || null, phone });
+  hideLoading();
+  if(res.ok) {
+    toast('✓ Opt-in confirmation sent');
+    await loadSmsData();
+    renderSmsContent();
+  } else {
+    toast('Failed: ' + (res.error || 'Unknown'), 'err');
+  }
+}
+
+// ── PROMO BLAST ──
+function openPromoBlast() {
+  const s = S_smsSettings || {};
+  if(!s.promo_blast) { toast('Enable Promo Blast first','err'); return; }
+  const msg = prompt('Enter your promotional message:');
+  if(!msg) return;
+  const finalMsg = smsTemplate(s.promo_blast_template || '{message} - {store}. Reply STOP to opt out.', { message: msg });
+  const confirmed = S_smsOptIns.filter(o => o.status === 'confirmed').length;
+  if(!confirm(`Send to ${confirmed} opted-in customers?\n\n"${finalMsg}"`)) return;
+  sendBulkSms(finalMsg, 'promo_blast');
+}
+
+function openNewProductBlast() {
+  const s = S_smsSettings || {};
+  if(!s.new_product_sms) { toast('Enable New Product SMS first','err'); return; }
+  const msg = prompt('Enter your product announcement:');
+  if(!msg) return;
+  const finalMsg = smsTemplate(s.new_product_template || '{message} - {store}. Reply STOP to opt out.', { message: msg });
+  const confirmed = S_smsOptIns.filter(o => o.status === 'confirmed').length;
+  if(!confirm(`Send to ${confirmed} opted-in customers?\n\n"${finalMsg}"`)) return;
+  sendBulkSms(finalMsg, 'new_product');
+}
+
+async function sendBulkSms(message, type) {
+  showLoading('Sending...');
+  const res = await callSmsEdge({ action: 'bulk', business_id: String(bizId()), message, type });
+  hideLoading();
+  if(res.ok) {
+    toast(`✓ Sent to ${res.sent} customers`);
+    await loadSmsData();
+    renderSmsContent();
+  } else {
+    toast('Failed: ' + (res.error || 'Unknown'), 'err');
+  }
+}
+
+// ══════════════════════════════════════════
+//  SMS TRIGGERS — called throughout the app
+// ══════════════════════════════════════════
+
+async function smsSend(to, message, type) {
+  if(!S_twilioConfig?.master_enabled) return;
+  if(!to) return;
+  callSmsEdge({ action: 'send', business_id: String(bizId()), to, message, type });
+}
+
+function getOwnerPhone() {
+  return S.settings?.ownerPhone || currentProfile?.phone || null;
+}
+
+// Operational alerts — all go to owner phone
+async function smsCheckSaleAlerts(sale, dailyTotal) {
+  const s   = S_smsSettings || {};
+  const own = getOwnerPhone();
+  if(!own) return;
+  const store = S.settings?.storeName || 'Store';
+
+  if(s.large_sale && sale.total >= (s.large_sale_threshold||200)) {
+    smsSend(own, `${store}: Large sale — ${sale.product_name} ${fmt(sale.total)}`, 'large_sale');
+  }
+  if(s.high_discount && sale.discount > 0) {
+    const pct = sale.total > 0 ? Math.round((sale.discount/(sale.total+sale.discount))*100) : 0;
+    if(pct >= (s.high_discount_threshold||20)) {
+      smsSend(own, `${store}: High discount alert — ${pct}% off on ${fmt(sale.total+sale.discount)} sale`, 'high_discount');
+    }
+  }
+}
+
+async function smsLowStock(product) {
+  const s = S_smsSettings || {};
+  if(!s.low_stock) return;
+  const own = getOwnerPhone();
+  if(!own) return;
+  smsSend(own, `${S.settings?.storeName||'Store'}: Low stock — ${product.name} has ${product.stock} ${product.unit||'units'} remaining`, 'low_stock');
+}
+
+async function smsOutOfStock(product) {
+  const s = S_smsSettings || {};
+  if(!s.out_of_stock) return;
+  const own = getOwnerPhone();
+  if(!own) return;
+  smsSend(own, `${S.settings?.storeName||'Store'}: OUT OF STOCK — ${product.name} has hit zero`, 'out_of_stock');
+}
+
+async function smsNewMemberLogin(profile) {
+  const s = S_smsSettings || {};
+  if(!s.new_member_login) return;
+  const own = getOwnerPhone();
+  if(!own) return;
+  smsSend(own, `${S.settings?.storeName||'Store'}: ${profile?.full_name||profile?.email} just logged in for the first time`, 'new_member_login');
+}
+
+async function smsUnusualLogin(profile) {
+  const s = S_smsSettings || {};
+  if(!s.unusual_login) return;
+  const own = getOwnerPhone();
+  if(!own) return;
+  smsSend(own, `${S.settings?.storeName||'Store'}: Unusual login detected for ${profile?.full_name||profile?.email}`, 'unusual_login');
+}
+
+// Customer-facing SMS triggers
+async function smsPointsMilestone(cust, points) {
+  const s = S_smsSettings || {};
+  if(!s.points_milestone) return;
+  if(points < (s.points_milestone_threshold||500)) return;
+  const opt = S_smsOptIns.find(o => o.customer_id == cust.id && o.status === 'confirmed');
+  if(!opt) return;
+  const msg = smsTemplate(s.points_milestone_template||'Hi {name}! You just hit {points} points at {store}!', {
+    name: cust.first_name, points, store: S.settings?.storeName||'Store'
+  });
+  callSmsEdge({ action: 'send', business_id: String(bizId()), to: opt.phone, message: msg, type: 'points_milestone' });
+}
+
+async function smsGiftPending(cust) {
+  const s = S_smsSettings || {};
+  if(!s.gift_pending) return;
+  const opt = S_smsOptIns.find(o => o.customer_id == cust.id && o.status === 'confirmed');
+  if(!opt) return;
+  const msg = smsTemplate(s.gift_pending_template||'Hi {name}! You have a VIP gift waiting at {store}.', {
+    name: cust.first_name, store: S.settings?.storeName||'Store'
+  });
+  callSmsEdge({ action: 'send', business_id: String(bizId()), to: opt.phone, message: msg, type: 'gift_pending' });
+}
+
+async function smsDoublePoints() {
+  const s = S_smsSettings || {};
+  if(!s.double_points_sms) return;
+  const msg = smsTemplate(s.double_points_template||'Double points are LIVE at {store} today!', {
+    store: S.settings?.storeName||'Store'
+  });
+  callSmsEdge({ action: 'bulk', business_id: String(bizId()), message: msg, type: 'double_points' });
+}
+
+// Background SMS checks (birthday, win-back) — run alongside notification checks
+async function runBackgroundSmsChecks() {
+  if(!S_twilioConfig?.master_enabled) return;
+  const s   = S_smsSettings || {};
+  const today = new Date();
+  const mm    = String(today.getMonth()+1).padStart(2,'0');
+
+  // Birthday SMS
+  if(s.birthday_sms) {
+    const bday = (S.customers||[]).filter(c => {
+      if(!c.birthday) return false;
+      return c.birthday.slice(5,7) === mm;
+    });
+    for(const c of bday) {
+      const opt = S_smsOptIns.find(o => o.customer_id == c.id && o.status === 'confirmed');
+      if(!opt) continue;
+      const alreadySent = S_smsLog.find(l => l.type === 'birthday' && l.to_phone === opt.phone && l.created_at?.slice(0,7) === today.toISOString().slice(0,7));
+      if(alreadySent) continue;
+      const msg = smsTemplate(s.birthday_template||'Happy Birthday {name}! 🎂 - {store}', {
+        name: c.first_name, store: S.settings?.storeName||'Store'
+      });
+      callSmsEdge({ action: 'send', business_id: String(bizId()), to: opt.phone, message: msg, type: 'birthday' });
+    }
+  }
+
+  // Win-back SMS
+  if(s.win_back) {
+    const days = s.win_back_days || 45;
+    const cutoff = new Date(Date.now() - days*864e5).toISOString().slice(0,10);
+    const inactive = (S.customers||[]).filter(c => {
+      if(!c.last_visit) return false;
+      return c.last_visit < cutoff;
+    });
+    for(const c of inactive) {
+      const opt = S_smsOptIns.find(o => o.customer_id == c.id && o.status === 'confirmed');
+      if(!opt) continue;
+      const alreadySent = S_smsLog.find(l => l.type === 'win_back' && l.to_phone === opt.phone && l.created_at?.slice(0,10) >= cutoff);
+      if(alreadySent) continue;
+      const msg = smsTemplate(s.win_back_template||'Hi {name}, we miss you at {store}!', {
+        name: c.first_name, store: S.settings?.storeName||'Store'
+      });
+      callSmsEdge({ action: 'send', business_id: String(bizId()), to: opt.phone, message: msg, type: 'win_back' });
+    }
+  }
+}
+
+
+// ═══════════════════════════════════════════════════
 //  OPERATOR DASHBOARD — Feature 7
 //  Only visible when b2ops804@gmail.com is logged in
 // ═══════════════════════════════════════════════════
@@ -5673,6 +6304,7 @@ async function checkSaleNotifications(sale, dailyTotal) {
 
   // Any sale
   notifyAnySale(sale);
+  smsCheckSaleAlerts(sale, dailyTotal);
 
   // Large transaction
   const threshold = s.large_transaction_amount || 200;
@@ -5764,6 +6396,8 @@ async function notifyStaffLogin(profile) {
     notifyNewDeviceLogin(profile);
     // First login / invite accepted
     notifyInviteAccepted(profile);
+    smsNewMemberLogin(profile);
+    smsUnusualLogin(profile);
   }
 }
 
@@ -5892,6 +6526,8 @@ async function runBackgroundNotificationChecks() {
 
   // Multi low stock bundled alert
   checkMultiLowStock();
+  // Background SMS checks
+  runBackgroundSmsChecks();
 
   // Low stock / out of stock
   if(s.low_stock !== false || s.out_of_stock !== false) {
@@ -6154,6 +6790,7 @@ async function processLoyaltyForSale(saleRow, total) {
     notifyTierChange(cust, prevTier, newTier);
     if(newTier === 'bronze' && prevTier === 'none') notifyBronzeFirst(cust);
   }
+  smsPointsMilestone(cust, cust.points||0);
 }
 
 function checkBirthdayBonus(cust, tier) {
