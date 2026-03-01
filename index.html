@@ -1941,7 +1941,7 @@ async function signIn() {
   btn.textContent = 'Signing in...'; btn.disabled = true;
   const { error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.textContent = 'Sign In'; btn.disabled = false;
-  if(error) showAuthError('login-error', error.message);
+  if(error) { showAuthError('login-error', error.message); trackFailedLogin(email); }
 }
 
 async function resetPassword() {
@@ -2390,6 +2390,7 @@ async function confirmRestock() {
   const p=S.products.find(x=>x.id===restockId);
   showLoading('Updating stock...');
   await dbUpdate('products', p.id, {stock: p.stock+qty});
+  notifyRestockLogged(p, qty);
   await refreshAllData();
   hideLoading(); closeModal('restock-modal'); renderInventory();
   toast('✓ Restocked '+p.name);
@@ -3592,8 +3593,10 @@ async function inviteMember(){
 
 async function removeMember(memberId){
   if(!confirm('Remove this team member?')) return;
+  const member = S.team?.find(m => m.id === memberId);
   showLoading('Removing...');
   await sb.from('profiles').delete().eq('id',memberId).eq('business_id',bizId());
+  if(member) notifyMemberRemoved(member.full_name || member.email || 'Team member');
   hideLoading(); renderTeam(); toast('Member removed');
 }
 
@@ -4777,22 +4780,49 @@ async function sendPushToSubscribers(notif) {
 // ═══════════════════════════════════════════════════
 
 const NOTIF_ICONS = {
-  sale_milestone:    '💰',
-  large_transaction: '💵',
-  slow_day:          '📉',
-  low_stock:         '⚠️',
-  out_of_stock:      '🚫',
-  dead_stock:        '🪦',
-  at_risk_customer:  '👤',
-  new_customer:      '🆕',
-  tier_upgrade:      '⬆️',
-  tier_drop:         '⬇️',
-  points_expiring:   '⏳',
-  coupon_expiring:   '🎟️',
-  coupon_limit:      '🎟️',
-  coupon_auto:       '⚡',
-  staff_login:       '🟢',
-  staff_logout:      '🔴',
+  // Sales
+  any_sale:              '🛍️',
+  sale_milestone:        '💰',
+  large_transaction:     '💵',
+  coupon_applied:        '🎟️',
+  high_discount:         '🏷️',
+  slow_day:              '📉',
+  daily_summary:         '📊',
+  sales_pace:            '⚡',
+  // Inventory
+  low_stock:             '⚠️',
+  out_of_stock:          '🚫',
+  dead_stock:            '🪦',
+  restock_logged:        '📦',
+  multi_low_stock:       '⚠️',
+  // Customers
+  at_risk_customer:      '👤',
+  new_customer:          '🆕',
+  // Loyalty
+  bronze_first:          '🥉',
+  tier_upgrade:          '⬆️',
+  tier_drop:             '⬇️',
+  points_expiring:       '⏳',
+  points_redeemed:       '🎁',
+  double_points:         '✨',
+  // Coupons
+  coupon_expiring:       '🎟️',
+  coupon_limit:          '🎟️',
+  coupon_auto:           '⚡',
+  // Team & Security
+  staff_login:           '🟢',
+  staff_logout:          '🔴',
+  login_outside_hours:   '🕐',
+  new_device_login:      '📱',
+  another_device_login:  '🔒',
+  invite_accepted:       '✅',
+  member_removed:        '👋',
+  failed_login:          '🚨',
+  // System
+  operator_announcement: '📢',
+  tos_updated:           '📋',
+  new_feature:           '🆕',
+  maintenance:           '🔧',
 };
 
 // ── Badge ──
@@ -4816,6 +4846,18 @@ async function createNotification(type, title, body, linkScreen=null, linkId=nul
   // Check settings — is this type enabled?
   const settings = S_notifSettings;
   if(settings && settings[type] === false) return;
+
+  // Check quiet hours
+  if(settings?.quiet_hours_enabled) {
+    const now = new Date();
+    const hhmm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    const qs = settings.quiet_hours_start || '22:00';
+    const qe = settings.quiet_hours_end   || '08:00';
+    const inQuiet = qs > qe
+      ? (hhmm >= qs || hhmm < qe)   // overnight window e.g. 22:00–08:00
+      : (hhmm >= qs && hhmm < qe);  // same-day window
+    if(inQuiet) return; // silently drop during quiet hours
+  }
 
   const notif = {
     business_id: String(bid),
@@ -4967,6 +5009,7 @@ function loadNotificationSettings() {
 
   el.innerHTML = `
     <div class="sec" style="margin-top:0">Sales</div>
+    ${tog('any_sale','Any Sale Logged','Every sale triggers a notification')}
     ${tog('sale_milestone','Daily Revenue Milestone','Alert when daily revenue hits target')}
     <div class="fgroup" style="margin:0 0 8px">
       <label class="flabel">Milestone Amount ($)</label>
@@ -4977,30 +5020,64 @@ function loadNotificationSettings() {
       <label class="flabel">Large Transaction Amount ($)</label>
       <input class="finput" id="ns-large-amt" value="${s.large_transaction_amount||200}" type="number" data-persist/>
     </div>
+    ${tog('coupon_applied','Coupon Applied to Sale','')}
+    ${tog('high_discount','High Discount Alert','')}
+    <div class="fgroup" style="margin:0 0 8px">
+      <label class="flabel">High Discount Threshold (%)</label>
+      <input class="finput" id="ns-discount-threshold" value="${s.high_discount_threshold||20}" type="number" data-persist/>
+    </div>
     ${tog('slow_day','Slow Day Alert','Revenue below daily average by 3pm')}
+    ${tog('daily_summary','Daily Revenue Summary','')}
+    <div class="fgroup" style="margin:0 0 8px">
+      <label class="flabel">Summary Send Time</label>
+      <input class="finput" id="ns-summary-time" value="${s.daily_summary_time||'20:00'}" type="time" data-persist/>
+    </div>
 
     <div class="sec">Inventory</div>
     ${tog('low_stock','Low Stock','Product below low stock threshold')}
     ${tog('out_of_stock','Out of Stock','Product hits zero')}
     ${tog('dead_stock','Dead Stock','No sales in 30 days')}
+    ${tog('restock_logged','Restock Logged','When stock is manually restocked')}
+    ${tog('multi_low_stock','Multiple Low Stock','3+ products low at once — bundled alert')}
 
     <div class="sec">Customers</div>
     ${tog('new_customer','New Customer','Someone new added to the system')}
     ${tog('at_risk_customer','At-Risk Customer','No visit in 30+ days')}
 
     <div class="sec">Loyalty</div>
+    ${tog('bronze_first','First Bronze Member','First time a customer hits Bronze')}
     ${tog('tier_upgrade','Tier Upgrade','Customer moves up a tier')}
     ${tog('tier_drop','Tier Drop','Customer drops a tier')}
     ${tog('points_expiring','Points Expiring','Points expire within 7 days')}
+    ${tog('points_redeemed','Points Redeemed','Points used at checkout')}
+    ${tog('double_points_activated','Double Points Activated','')}
 
     <div class="sec">Coupons</div>
+    ${tog('coupon_applied','Coupon Applied','Coupon used on a sale')}
     ${tog('coupon_expiring','Coupon Expiring','Coupon expires within 24 hours')}
     ${tog('coupon_limit','Usage Limit Reached','Coupon hits max redemptions')}
     ${tog('coupon_auto','Auto-Generated','Trigger coupon created')}
 
-    <div class="sec">Team</div>
+    <div class="sec">Team & Security</div>
     ${tog('staff_login','Staff Login','Team member signs in')}
     ${tog('staff_logout','Staff Logout','Team member signs out')}
+    ${tog('login_outside_hours','Login Outside Business Hours','')}
+    <div class="frow" style="gap:8px;margin:0 0 8px">
+      <div class="fgroup" style="flex:1"><label class="flabel">Hours Start</label><input class="finput" id="ns-hours-start" value="${s.business_hours_start||'09:00'}" type="time" data-persist/></div>
+      <div class="fgroup" style="flex:1"><label class="flabel">Hours End</label><input class="finput" id="ns-hours-end" value="${s.business_hours_end||'21:00'}" type="time" data-persist/></div>
+    </div>
+    ${tog('new_device_login','New Device Login','')}
+    ${tog('another_device_login','Signed In On Another Device','')}
+    ${tog('invite_accepted','Invite Accepted','First login of invited member')}
+    ${tog('member_removed','Team Member Removed','')}
+    <div style="font-size:11px;color:var(--gold);padding:8px 0">⚠️ Failed login alerts (3 attempts) are always on</div>
+
+    <div class="sec">Quiet Hours</div>
+    ${tog('quiet_hours_enabled','Enable Quiet Hours','No notifications during this window')}
+    <div class="frow" style="gap:8px;margin:0 0 8px">
+      <div class="fgroup" style="flex:1"><label class="flabel">Quiet From</label><input class="finput" id="ns-quiet-start" value="${s.quiet_hours_start||'22:00'}" type="time" data-persist/></div>
+      <div class="fgroup" style="flex:1"><label class="flabel">Quiet Until</label><input class="finput" id="ns-quiet-end" value="${s.quiet_hours_end||'08:00'}" type="time" data-persist/></div>
+    </div>
 
     <div class="sec">Visibility</div>
     ${tog('visible_to_staff','Staff can see notifications','')}
@@ -5019,29 +5096,57 @@ function toggleNotifSetting(key, btn) {
 }
 
 async function saveNotificationSettings() {
-  const milestoneAmt = parseFloat(document.getElementById('ns-milestone-amt')?.value) || 1000;
-  const largeAmt     = parseFloat(document.getElementById('ns-large-amt')?.value)     || 200;
   const s = S_notifSettings || {};
+  const gv = id => document.getElementById(id)?.value;
   const data = {
     business_id: String(bizId()),
-    sale_milestone:           s.sale_milestone           !== false,
-    sale_milestone_amount:    milestoneAmt,
+    // Sales
+    any_sale:                 s.any_sale                  === true,
+    sale_milestone:           s.sale_milestone            !== false,
+    sale_milestone_amount:    parseFloat(gv('ns-milestone-amt'))   || 1000,
     large_transaction:        s.large_transaction         !== false,
-    large_transaction_amount: largeAmt,
+    large_transaction_amount: parseFloat(gv('ns-large-amt'))       || 200,
+    coupon_applied:           s.coupon_applied            !== false,
+    high_discount:            s.high_discount             !== false,
+    high_discount_threshold:  parseFloat(gv('ns-discount-threshold')) || 20,
     slow_day:                 s.slow_day                  !== false,
+    daily_summary:            s.daily_summary             === true,
+    daily_summary_time:       gv('ns-summary-time')       || '20:00',
+    // Inventory
     low_stock:                s.low_stock                 !== false,
     out_of_stock:             s.out_of_stock              !== false,
     dead_stock:               s.dead_stock                !== false,
-    at_risk_customer:         s.at_risk_customer          !== false,
+    restock_logged:           s.restock_logged            !== false,
+    multi_low_stock:          s.multi_low_stock           !== false,
+    // Customers
     new_customer:             s.new_customer              !== false,
+    at_risk_customer:         s.at_risk_customer          !== false,
+    // Loyalty
+    bronze_first:             s.bronze_first              !== false,
     tier_upgrade:             s.tier_upgrade              !== false,
     tier_drop:                s.tier_drop                 !== false,
     points_expiring:          s.points_expiring           !== false,
+    points_redeemed:          s.points_redeemed           === true,
+    double_points_activated:  s.double_points_activated   !== false,
+    // Coupons
     coupon_expiring:          s.coupon_expiring           !== false,
     coupon_limit:             s.coupon_limit              !== false,
     coupon_auto:              s.coupon_auto               !== false,
+    // Team & Security
     staff_login:              s.staff_login               !== false,
     staff_logout:             s.staff_logout              !== false,
+    login_outside_hours:      s.login_outside_hours       !== false,
+    business_hours_start:     gv('ns-hours-start')        || '09:00',
+    business_hours_end:       gv('ns-hours-end')          || '21:00',
+    new_device_login:         s.new_device_login          !== false,
+    another_device_login:     s.another_device_login      !== false,
+    invite_accepted:          s.invite_accepted           !== false,
+    member_removed:           s.member_removed            !== false,
+    // Quiet hours
+    quiet_hours_enabled:      s.quiet_hours_enabled       === true,
+    quiet_hours_start:        gv('ns-quiet-start')        || '22:00',
+    quiet_hours_end:          gv('ns-quiet-end')          || '08:00',
+    // Visibility
     visible_to_staff:         s.visible_to_staff          || false,
     visible_to_manager:       s.visible_to_manager        !== false,
     updated_at:               new Date().toISOString(),
@@ -5065,6 +5170,9 @@ async function saveNotificationSettings() {
 async function checkSaleNotifications(sale, dailyTotal) {
   const s = S_notifSettings || {};
 
+  // Any sale
+  notifyAnySale(sale);
+
   // Large transaction
   const threshold = s.large_transaction_amount || 200;
   if(s.large_transaction !== false && sale.total >= threshold) {
@@ -5076,13 +5184,19 @@ async function checkSaleNotifications(sale, dailyTotal) {
     );
   }
 
+  // Coupon applied
+  if(sale.coupon_code) notifyCouponApplied(sale.coupon_code, sale.total);
+
+  // High discount
+  if(sale.discount && sale.discount > 0) notifyHighDiscount(sale.discount, sale.total);
+
   // Daily milestone
   const milestone = s.sale_milestone_amount || 1000;
   const prevTotal = dailyTotal - sale.total;
   if(s.sale_milestone !== false && prevTotal < milestone && dailyTotal >= milestone) {
     await createNotification(
       'sale_milestone',
-      `Daily Milestone Hit! 🎉`,
+      'Daily Milestone Hit! 🎉',
       `Revenue crossed ${fmt(milestone)} today — ${fmt(dailyTotal)} total`,
       'gen-report'
     );
@@ -5138,20 +5252,145 @@ async function notifyCouponLimit(couponCode) {
 
 // Staff login notification
 async function notifyStaffLogin(profile) {
-  if((S_notifSettings?.staff_login) === false) return;
-  if(profile?.role === 'owner') return; // don't notify for owner login
-  await createNotification(
-    'staff_login',
-    'Staff Signed In',
-    `${profile?.full_name || profile?.email || 'A team member'} just logged in`,
-    'team'
-  );
+  if(profile?.role !== 'owner') {
+    // Staff login notification
+    if((S_notifSettings?.staff_login) !== false) {
+      await createNotification('staff_login', 'Staff Signed In', `${profile?.full_name || profile?.email || 'A team member'} just logged in`, 'team');
+    }
+    // Outside hours check
+    notifyLoginOutsideHours(profile);
+    // New device check
+    notifyNewDeviceLogin(profile);
+    // First login / invite accepted
+    notifyInviteAccepted(profile);
+  }
 }
 
 // ── Background checks (run once on login + hourly) ──
+
+// ── Any sale logged ──
+async function notifyAnySale(sale) {
+  if((S_notifSettings?.any_sale) !== true) return; // off by default
+  const prod = S.products.find(p => p.id === sale.product_id);
+  await createNotification('any_sale', 'Sale Logged', `${prod?.name||'Item'} — ${fmt(sale.total)}`, 'history');
+}
+
+// ── Coupon applied to sale ──
+async function notifyCouponApplied(couponCode, total) {
+  if((S_notifSettings?.coupon_applied) === false) return;
+  await createNotification('coupon_applied', 'Coupon Applied', `${couponCode} used on ${fmt(total)} sale`, 'coupons');
+}
+
+// ── High discount ──
+async function notifyHighDiscount(discount, total) {
+  const s = S_notifSettings || {};
+  if(s.high_discount === false) return;
+  const threshold = s.high_discount_threshold || 20;
+  const pct = total > 0 ? (discount/total)*100 : 0;
+  if(pct < threshold) return;
+  await createNotification('high_discount', 'High Discount Alert', `${pct.toFixed(0)}% discount (${fmt(discount)}) applied to ${fmt(total+discount)} sale`, 'history');
+}
+
+// ── Restock logged ──
+async function notifyRestockLogged(product, qty) {
+  if((S_notifSettings?.restock_logged) === false) return;
+  await createNotification('restock_logged', 'Restock Logged', `${product.name} restocked +${qty} ${product.unit||'units'}`, 'inventory');
+}
+
+// ── Bronze first time ──
+async function notifyBronzeFirst(cust) {
+  if((S_notifSettings?.bronze_first) === false) return;
+  const alreadyNotified = S_notifications.find(n => n.type === 'bronze_first' && n.link_id === String(cust.id));
+  if(alreadyNotified) return; // only once ever
+  await createNotification('bronze_first', 'First Bronze Member!', `${custName(cust)} just qualified for Bronze tier`, 'customer-profile', String(cust.id));
+}
+
+// ── Double points activated ──
+async function notifyDoublePointsActivated() {
+  if((S_notifSettings?.double_points_activated) === false) return;
+  await createNotification('double_points', 'Double Points Activated', 'Double points event is now live', 'loyalty-settings');
+}
+
+// ── Points redeemed at sale ──
+async function notifyPointsRedeemed(cust, pts, discount) {
+  if((S_notifSettings?.points_redeemed) !== true) return; // off by default
+  await createNotification('points_redeemed', 'Points Redeemed', `${custName(cust)} redeemed ${pts} pts for ${fmt(discount)} off`, 'customer-profile', String(cust.id));
+}
+
+// ── Login outside business hours ──
+async function notifyLoginOutsideHours(profile) {
+  const s = S_notifSettings || {};
+  if(s.login_outside_hours === false) return;
+  if(profile?.role === 'owner') return;
+  const now = new Date();
+  const hhmm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const start = s.business_hours_start || '09:00';
+  const end   = s.business_hours_end   || '21:00';
+  const outside = hhmm < start || hhmm > end;
+  if(!outside) return;
+  await createNotification('login_outside_hours', 'Login Outside Hours', `${profile?.full_name||profile?.email} logged in at ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}`, 'team');
+}
+
+// ── New device login ──
+async function notifyNewDeviceLogin(profile) {
+  if((S_notifSettings?.new_device_login) === false) return;
+  if(profile?.role === 'owner') return;
+  const deviceKey = 'b2ops_device_' + (currentUser?.id || '');
+  const knownDevice = localStorage.getItem(deviceKey);
+  const currentDevice = navigator.userAgent.slice(0,50);
+  if(!knownDevice) {
+    localStorage.setItem(deviceKey, currentDevice);
+    return; // first time — just register
+  }
+  if(knownDevice !== currentDevice) {
+    localStorage.setItem(deviceKey, currentDevice);
+    await createNotification('new_device_login', 'New Device Login', `${profile?.full_name||profile?.email} signed in from a new device`, 'team');
+  }
+}
+
+// ── Invite accepted (first login of invited member) ──
+async function notifyInviteAccepted(profile) {
+  if((S_notifSettings?.invite_accepted) === false) return;
+  const firstLoginKey = 'b2ops_firstlogin_' + profile.id;
+  if(localStorage.getItem(firstLoginKey)) return;
+  localStorage.setItem(firstLoginKey, '1');
+  await createNotification('invite_accepted', 'Team Member Joined', `${profile?.full_name||profile?.email} accepted their invite and logged in`, 'team');
+}
+
+// ── Member removed ──
+async function notifyMemberRemoved(memberName) {
+  if((S_notifSettings?.member_removed) === false) return;
+  await createNotification('member_removed', 'Team Member Removed', `${memberName} was removed from the account`, 'team');
+}
+
+// ── Failed login threshold (always on) ──
+let failedLoginCount = 0;
+async function trackFailedLogin(email) {
+  failedLoginCount++;
+  if(failedLoginCount >= 3) {
+    failedLoginCount = 0;
+    await createNotification('failed_login', '⚠️ Failed Login Alert', `3 failed login attempts for ${email}`, 'login');
+  }
+}
+
+// ── Multi low stock bundled ──
+async function checkMultiLowStock() {
+  if((S_notifSettings?.multi_low_stock) === false) return;
+  const lowProds = S.products.filter(p => p.stock > 0 && p.stock <= (p.low_stock_threshold||5));
+  if(lowProds.length >= 3) {
+    const alreadyToday = S_notifications.find(n => n.type === 'multi_low_stock' && n.created_at >= today());
+    if(!alreadyToday) {
+      await createNotification('multi_low_stock', 'Multiple Low Stock Products', `${lowProds.length} products are running low: ${lowProds.slice(0,3).map(p=>p.name).join(', ')}${lowProds.length>3?'...':''}`, 'inventory');
+    }
+  }
+}
+
 async function runBackgroundNotificationChecks() {
   const s = S_notifSettings || {};
   const bid = String(bizId());
+
+  // Multi low stock bundled alert
+  checkMultiLowStock();
 
   // Low stock / out of stock
   if(s.low_stock !== false || s.out_of_stock !== false) {
@@ -5314,6 +5553,11 @@ async function processLoyaltyForSale(saleRow, total) {
   const newLifetimeSpend  = (cust.lifetime_spend || 0) + total;
   const firstPurchaseAt  = cust.first_purchase_at || now;
 
+  // Notify points redeemed if any
+  if(saleRow.points_redeemed > 0) {
+    notifyPointsRedeemed(cust, saleRow.points_redeemed, calcRedeemDiscount ? calcRedeemDiscount() : 0);
+  }
+
   // ── Check for tier upgrade ──
   const prevTier = tier;
   const custForQualify = {...cust, monthly_order_count: newMonthlyOrders, monthly_spend: newMonthlySpend};
@@ -5407,6 +5651,7 @@ async function processLoyaltyForSale(saleRow, total) {
   if(tierChanged) {
     toast(`⬆️ ${custName(cust)} upgraded to ${TIER_LABELS[newTier]}!`);
     notifyTierChange(cust, prevTier, newTier);
+    if(newTier === 'bronze' && prevTier === 'none') notifyBronzeFirst(cust);
   }
 }
 
