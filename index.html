@@ -490,7 +490,7 @@ textarea.finput{resize:none;min-height:80px}
       <div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:3px;color:var(--t3);margin-top:2px">OPERATIONS DASHBOARD</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
-      <button class="icon-btn" onclick="go('notifications')" style="position:relative">
+      <button onclick="go('notifications')" style="position:relative;background:none;border:none;cursor:pointer;padding:4px;font-size:20px;line-height:1">
         🔔
         <span id="notif-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:9px;font-weight:900;border-radius:100px;padding:1px 5px;font-family:'DM Mono',monospace;min-width:16px;text-align:center"></span>
       </button>
@@ -1266,11 +1266,15 @@ textarea.finput{resize:none;min-height:80px}
 <!-- ════════ NOTIFICATION SETTINGS ════════ -->
 <div class="screen" id="screen-notification-settings">
   <div class="topbar">
-    <button class="back-btn" onclick="go('notifications')"><span class="back-arrow">←</span> Notifications</button>
+    <button class="back-btn" onclick="go('home')"><span class="back-arrow">←</span> Home</button>
     <div class="topbar-title">Notif Settings</div>
     <button class="topbar-right" onclick="saveNotificationSettings()">Save</button>
   </div>
   <div class="body">
+    <div style="margin-bottom:14px">
+      <button id="push-toggle-btn" class="btn full" onclick="requestPushPermission()">🔔 Enable Push Notifications</button>
+      <div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px">Sends alerts to your device even when app is closed</div>
+    </div>
     <div id="notif-settings-content"></div>
   </div>
 </div>
@@ -4639,6 +4643,123 @@ async function testResendConfig() {
 }
 
 
+
+// ═══════════════════════════════════════════════════
+//  PUSH NOTIFICATIONS — Web Push / Service Worker
+// ═══════════════════════════════════════════════════
+
+const VAPID_PUBLIC_KEY = 'rkR0TXFrGBc7s9gAGyNoOMzMPuKE_rOmtNUcGoRhnhvG0GQZx4KR3A0pnAeSrX6qGnpNbabxsvaW81FAQb4CSQ';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.register('/B2OPS/sw.js', { scope: '/B2OPS/' });
+    await navigator.serviceWorker.ready;
+    return reg;
+  } catch(e) {
+    console.log('SW registration failed:', e);
+    return false;
+  }
+}
+
+async function requestPushPermission() {
+  const reg = await registerServiceWorker();
+  if (!reg) { toast('Push notifications not supported in this browser', 'err'); return; }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') { toast('Notifications blocked — enable in browser settings', 'err'); return; }
+
+  try {
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+
+    // Save subscription to Supabase
+    await sb.from('push_subscriptions').insert({
+      business_id: String(bizId()),
+      user_id:     currentUser?.id,
+      subscription: subscription.toJSON(),
+      user_agent:   navigator.userAgent.slice(0, 200),
+    });
+
+    toast('✓ Push notifications enabled!');
+    updatePushButtonState(true);
+  } catch(e) {
+    toast('Failed to enable push: ' + e.message, 'err');
+  }
+}
+
+async function disablePushNotifications() {
+  if (!('serviceWorker' in navigator)) return;
+  const reg = await navigator.serviceWorker.getRegistration('/B2OPS/sw.js');
+  if (!reg) return;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    await sub.unsubscribe();
+    await sb.from('push_subscriptions').delete()
+      .eq('business_id', String(bizId()))
+      .eq('user_id', currentUser?.id);
+  }
+  toast('Push notifications disabled');
+  updatePushButtonState(false);
+}
+
+async function checkPushSubscriptionStatus() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/B2OPS/sw.js');
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return !!sub;
+  } catch(e) { return false; }
+}
+
+function updatePushButtonState(enabled) {
+  const btn = document.getElementById('push-toggle-btn');
+  if (!btn) return;
+  if (enabled) {
+    btn.textContent = '🔔 Push Notifications ON';
+    btn.className = 'btn full gold';
+    btn.onclick = disablePushNotifications;
+  } else {
+    btn.textContent = '🔔 Enable Push Notifications';
+    btn.className = 'btn full';
+    btn.onclick = requestPushPermission;
+  }
+}
+
+async function initPushButton() {
+  const enabled = await checkPushSubscriptionStatus();
+  updatePushButtonState(enabled);
+}
+
+// Send a push via Edge Function
+async function sendPushToSubscribers(notif) {
+  try {
+    await fetch(`${SUPA_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
+      body: JSON.stringify({
+        business_id: String(bizId()),
+        title: notif.title,
+        body:  notif.body,
+        type:  notif.type,
+        url:   'https://b2ops804.github.io/B2OPS/',
+      })
+    });
+  } catch(e) { /* silent — push failure never blocks UI */ }
+}
+
 // ═══════════════════════════════════════════════════
 //  NOTIFICATIONS — Feature 5
 // ═══════════════════════════════════════════════════
@@ -4700,6 +4821,7 @@ async function createNotification(type, title, body, linkScreen=null, linkId=nul
       S_notifications.unshift(data);
       updateNotifBadge();
       showInAppNotif(data);
+      sendPushToSubscribers(data);
     }
   } catch(e) {
     // Fallback — add in-memory only
@@ -4817,6 +4939,7 @@ async function clearAllNotifications() {
 
 // ── Notification Settings screen ──
 function loadNotificationSettings() {
+  setTimeout(initPushButton, 100);
   const el = document.getElementById('notif-settings-content');
   const s  = S_notifSettings || {};
 
