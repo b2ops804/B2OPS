@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SMS Consent Policy — B2OPS</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0a0a0a;color:#e0e0e0;padding:40px 20px;max-width:760px;margin:0 auto;line-height:1.7}
+    h1{font-size:26px;font-weight:800;color:#f5c400;letter-spacing:2px;margin-bottom:6px}
+    h2{font-size:16px;font-weight:700;color:#f5c400;margin:32px 0 10px;text-transform:uppercase;letter-spacing:1px}
+    p{font-size:14px;color:#ccc;margin-bottom:12px}
+    ul{padding-left:20px;margin-bottom:12px}
+    li{font-size:14px;color:#ccc;margin-bottom:6px}
+    .sub{font-size:12px;color:#888;margin-bottom:24px}
+    .divider{border:none;border-top:1px solid #2a2a2a;margin:24px 0}
+    .highlight{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:16px;margin-bottom:16px}
+    .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+  </style>
+</head>
+<body>
+
+  <h1>B2OPS</h1>
+  <div class="sub">SMS Opt-In Consent Policy · Last updated: March 2026</div>
+
+  <h2>Overview</h2>
+  <p>B2OPS is a retail operations and customer loyalty platform used by independent retail businesses to manage customer relationships, loyalty rewards, and operational communications. This document describes how SMS consent is collected and managed for businesses operating on the B2OPS platform.</p>
+
+  <hr class="divider"/>
+
+  <h2>How Consent Is Collected</h2>
+  <p>Customer SMS consent is collected at the point of loyalty program enrollment. The process is as follows:</p>
+  <ul>
+    <li>A customer provides their name and phone number to a staff member at the point of sale or enrollment.</li>
+    <li>The staff member enters the customer's information into the B2OPS platform, including their phone number.</li>
+    <li>The customer is informed verbally that by providing their phone number they may receive SMS messages related to their loyalty account, including points updates, birthday offers, and store notifications.</li>
+    <li>An automated double opt-in confirmation SMS is sent to the customer's phone number immediately upon enrollment.</li>
+    <li>The customer must reply <strong>YES</strong> to confirm consent before any further messages are sent.</li>
+    <li>If the customer does not reply YES, no further messages are sent to that number.</li>
+  </ul>
+
+  <hr class="divider"/>
+
+  <h2>Double Opt-In Confirmation Message</h2>
+  <div class="highlight">
+    <div class="label">Sample Opt-In Message Sent to Customer</div>
+    <p style="color:#fff;font-style:italic">"[Store Name]: Reply YES to receive text updates including points milestones, birthday offers, and account notifications. Reply STOP anytime to opt out. Msg &amp; data rates may apply."</p>
+  </div>
+
+  <hr class="divider"/>
+
+  <h2>Opt-Out</h2>
+  <p>Customers may opt out of SMS messages at any time by replying <strong>STOP</strong> to any message. Upon receiving a STOP reply:</p>
+  <ul>
+    <li>The customer is immediately unsubscribed from all future messages.</li>
+    <li>A confirmation message is sent: <em>"You have been unsubscribed and will receive no further messages. Reply START to resubscribe."</em></li>
+    <li>The opt-out is logged in the B2OPS platform and no further messages are sent to that number.</li>
+  </ul>
+
+  <hr class="divider"/>
+
+  <h2>HELP Response</h2>
+  <p>Customers who reply <strong>HELP</strong> receive the following response:</p>
+  <div class="highlight">
+    <p style="color:#fff;font-style:italic">"[Store Name] text alerts. Reply STOP to opt out or contact us for assistance."</p>
+  </div>
+
+  <hr class="divider"/>
+
+  <h2>Message Frequency</h2>
+  <p>Message frequency varies based on customer activity and store settings. Customers may receive messages related to:</p>
+  <ul>
+    <li>Loyalty points milestones</li>
+    <li>Birthday greetings (once per birthday month)</li>
+    <li>VIP reward notifications</li>
+    <li>Win-back messages (after extended inactivity)</li>
+    <li>Double points event announcements</li>
+    <li>New product announcements (sent manually by store owner)</li>
+  </ul>
+
+  <hr class="divider"/>
+
+  <h2>Business Identification</h2>
+  <p>Every outbound SMS message includes the store name so customers can identify the sender. No messages are sent from anonymous or unidentified sources.</p>
+
+  <hr class="divider"/>
+
+  <h2>Data Privacy</h2>
+  <p>Customer phone numbers are stored securely and are never sold or shared with third parties. Each business on the B2OPS platform manages their own customer data independently through their own Twilio account.</p>
+
+  <hr class="divider"/>
+
+  <h2>Contact</h2>
+  <p>For questions about this policy, contact: <a href="mailto:b2ops804@gmail.com" style="color:#f5c400">b2ops804@gmail.com</a></p>
+
+</body>
+</html>
