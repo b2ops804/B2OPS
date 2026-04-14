@@ -756,12 +756,12 @@ textarea.finput{resize:none;min-height:80px}
   <div class="body">
     <div class="fgroup">
       <label class="flabel">Product Name</label>
-      <input class="finput" id="ap-name" placeholder="e.g. Blue Dream"/>
+      <input class="finput" id="ap-name" data-persist placeholder="e.g. Blue Dream"/>
     </div>
     <div class="frow">
       <div class="fgroup">
         <label class="flabel">Category</label>
-        <select class="fselect" id="ap-cat">
+        <select class="fselect" id="ap-cat" data-persist>
           <option value="Flower">🌿 Flower</option>
           <option value="Edible">🍫 Edible</option>
           <option value="Drink">🥤 Drink</option>
@@ -772,7 +772,7 @@ textarea.finput{resize:none;min-height:80px}
       </div>
       <div class="fgroup">
         <label class="flabel">Base Unit</label>
-        <select class="fselect" id="ap-unit">
+        <select class="fselect" id="ap-unit" data-persist>
           <option value="unit">unit</option>
           <option value="g">gram (g)</option>
           <option value="oz">oz</option>
@@ -785,11 +785,11 @@ textarea.finput{resize:none;min-height:80px}
     <div class="frow">
       <div class="fgroup">
         <label class="flabel">Starting Stock</label>
-        <input class="finput" id="ap-stock" type="number" placeholder="0" min="0"/>
+        <input class="finput" id="ap-stock" data-persist type="number" placeholder="0" min="0"/>
       </div>
       <div class="fgroup">
         <label class="flabel">Low Stock Alert</label>
-        <input class="finput" id="ap-threshold" type="number" placeholder="5" min="1"/>
+        <input class="finput" id="ap-threshold" data-persist type="number" placeholder="5" min="1"/>
       </div>
     </div>
     <div class="tier-editor">
@@ -1389,15 +1389,15 @@ textarea.finput{resize:none;min-height:80px}
     <div class="sec">Store Info</div>
     <div class="fgroup">
       <label class="flabel">Store / Business Name</label>
-      <input class="finput" id="set-store-name" placeholder="My Store"/>
+      <input class="finput" id="set-store-name" placeholder="My Store" data-persist/>
     </div>
     <div class="fgroup">
       <label class="flabel">Owner Name</label>
-      <input class="finput" id="set-owner-name" placeholder="Owner"/>
+      <input class="finput" id="set-owner-name" placeholder="Owner" data-persist/>
     </div>
     <div class="fgroup">
       <label class="flabel">Owner Phone (for SMS alerts)</label>
-      <input class="finput" id="set-owner-phone" placeholder="+1xxxxxxxxxx" type="tel"/>
+      <input class="finput" id="set-owner-phone" placeholder="+1xxxxxxxxxx" type="tel" data-persist/>
     </div>
     <button class="btn fill-gold full bebas" onclick="saveSettings()">Save Settings</button>
     <div class="divider"></div>
@@ -1832,6 +1832,8 @@ function go(id) {
   if(!['login','forgot'].includes(id) && !canAccess(id)) {
     toast('Access restricted for your role','err'); return;
   }
+  // Reset edit state when leaving add-product
+  if(currentScreen === 'add-product' && id !== 'add-product') editProductId = null;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-'+id);
   if(!el) { toast('Screen not found','err'); return; }
@@ -2447,6 +2449,7 @@ async function confirmSale() {
     product_id: p.id, product_name: p.name, category: p.category,
     tier_label: tier.label, qty: tier.deduct,
     price: tier.price, discount: disc + redeemDisc, total,
+    points_redeemed: saleState.redeemPts || 0,
     coupon_code: saleState.couponCode||null,
     customer_id: saleState.customerId||null,
     date: today(),
@@ -2481,7 +2484,7 @@ function renderInventory() {
   const el=document.getElementById('inv-list');
   if(!S.products.length){el.innerHTML='<div class="empty"><div class="empty-icon">📦</div><div class="empty-txt">No products yet</div></div>';return;}
   el.innerHTML=S.products.map(p=>{
-    const sc=p.stock<=0?'out':p.stock<=p.threshold?'low':'ok';
+    const sc=p.stock<=0?'out':p.stock<=(p.low_stock_threshold||p.threshold||5)?'low':'ok';
     const tiers=Array.isArray(p.tiers)?p.tiers:(typeof p.tiers==='string'?JSON.parse(p.tiers||'[]'):[]);
     const tierPills=tiers.map(t=>`<span class="pill gold">${t.label} ${fmt(t.price)}</span>`).join('');
     const canEdit=canAccess('add-product');
@@ -2523,7 +2526,8 @@ async function confirmRestock() {
 // ═══════════════════════════════════════════════════
 let editProductId=null;
 function setupAddProduct() {
-  editProductId=null;
+  // If editProductId is set, editProduct() already populated the form — don't reset
+  if(editProductId) return;
   document.getElementById('add-product-title').textContent='Add Product';
   document.getElementById('ap-submit-btn').textContent='Add Product';
   document.getElementById('ap-delete-btn').style.display='none';
@@ -2535,20 +2539,22 @@ function setupAddProduct() {
 
 function editProduct(id) {
   editProductId=id;
+  go('add-product');
+  // Populate after go() so fields aren't cleared
   const p=S.products.find(x=>x.id===id);
+  if(!p) return;
   document.getElementById('add-product-title').textContent='Edit Product';
   document.getElementById('ap-submit-btn').textContent='Save Changes';
   document.getElementById('ap-delete-btn').style.display='block';
   document.getElementById('ap-name').value=p.name;
-  document.getElementById('ap-cat').value=p.category;
-  document.getElementById('ap-unit').value=p.unit;
-  document.getElementById('ap-stock').value=p.stock;
-  document.getElementById('ap-threshold').value=p.threshold;
+  document.getElementById('ap-cat').value=p.category||'Flower';
+  document.getElementById('ap-unit').value=p.unit||'unit';
+  document.getElementById('ap-stock').value=p.stock||0;
+  document.getElementById('ap-threshold').value=p.low_stock_threshold||p.threshold||5;
   const rows=document.getElementById('ap-tier-rows');
   rows.innerHTML='';
   const tiers=Array.isArray(p.tiers)?p.tiers:(typeof p.tiers==='string'?JSON.parse(p.tiers||'[]'):[]);
   tiers.forEach(t=>addTierRow('ap-tier-rows',t));
-  go('add-product');
 }
 
 function addTierRow(containerId,tier=null){
@@ -2572,7 +2578,7 @@ async function submitProduct() {
   const name=document.getElementById('ap-name').value.trim();
   if(!name){toast('Enter a product name','err');return;}
   const tiers=getTiers('ap-tier-rows');
-  const data={name,category:document.getElementById('ap-cat').value,unit:document.getElementById('ap-unit').value,stock:parseInt(document.getElementById('ap-stock').value)||0,threshold:parseInt(document.getElementById('ap-threshold').value)||5,tiers:JSON.stringify(tiers)};
+  const data={name,category:document.getElementById('ap-cat').value,unit:document.getElementById('ap-unit').value,stock:parseInt(document.getElementById('ap-stock').value)||0,low_stock_threshold:parseInt(document.getElementById('ap-threshold').value)||5,tiers:JSON.stringify(tiers)};
   showLoading(editProductId?'Updating...':'Adding...');
   if(editProductId){await dbUpdate('products',editProductId,data);toast('✓ Product updated');}
   else{await dbInsert('products',data);toast('✓ Product added');}
@@ -5234,7 +5240,8 @@ async function smsCheckSaleAlerts(sale, dailyTotal) {
     smsSend(own, `${store}: Large sale — ${sale.product_name} ${fmt(sale.total)}`, 'large_sale');
   }
   if(s.high_discount && sale.discount > 0) {
-    const pct = sale.total > 0 ? Math.round((sale.discount/(sale.total+sale.discount))*100) : 0;
+    const grossTotal = (sale.total||0) + (sale.discount||0);
+    const pct = grossTotal > 0 ? Math.round(((sale.discount||0)/grossTotal)*100) : 0;
     if(pct >= (s.high_discount_threshold||20)) {
       smsSend(own, `${store}: High discount alert — ${pct}% off on ${fmt(sale.total+sale.discount)} sale`, 'high_discount');
     }
@@ -5393,30 +5400,42 @@ function checkOperatorMode() {
 }
 
 // ── Load all operator data ──
+
+// ── Operator Edge Function caller ──
+async function callOperatorEdge(payload) {
+  try {
+    const res = await fetch(`${SUPA_URL}/functions/v1/operator-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
+      body: JSON.stringify({ ...payload, operator_email: currentUser?.email }),
+    });
+    return await res.json();
+  } catch(e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 async function loadOperatorData() {
   if(!isOperator) return;
 
-  // All profiles (clients)
-  const { data: profiles } = await sb.from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
-  OP.allProfiles = profiles || [];
+  const res = await callOperatorEdge({ action: 'load' });
+  if(!res.ok) { toast('Operator data load failed: ' + (res.error||'unknown'), 'err'); return; }
 
-  // Group by business_id (owner profiles only)
-  const owners = OP.allProfiles.filter(p => p.role === 'owner' || !p.role);
-  OP.clients = owners;
+  OP.allProfiles  = res.profiles      || [];
+  OP.allSales     = res.sales         || [];
+  OP.billing      = res.billing       || [];
+  OP.announcements = res.announcements || [];
 
-  // All sales across all businesses
-  const { data: sales } = await sb.from('sales').select('*').order('created_at', { ascending: false }).limit(5000);
-  OP.allSales = sales || [];
-
-  // Billing
-  const { data: billing } = await sb.from('operator_billing').select('*');
-  OP.billing = billing || [];
-
-  // Announcements
-  const { data: ann } = await sb.from('operator_announcements').select('*').order('created_at', { ascending: false }).limit(50);
-  OP.announcements = ann || [];
+  // Clients = owner profiles (role === 'owner' or no role but has no business_id assigned to another)
+  // An owner's business_id equals their own id
+  OP.clients = OP.allProfiles.filter(p => p.id === p.business_id || p.role === 'owner' || (!p.role && !p.business_id) || (p.role === 'owner'));
+  // Deduplicate by id
+  const seen = new Set();
+  OP.clients = OP.allProfiles.filter(p => {
+    const isOwner = p.role === 'owner' || String(p.id) === String(p.business_id);
+    if(isOwner && !seen.has(p.id)) { seen.add(p.id); return true; }
+    return false;
+  });
 }
 
 // ── Tab switcher ──
@@ -5663,11 +5682,7 @@ async function editClientBilling(clientId) {
     trial_expires: trialExp||null,
     updated_at: new Date().toISOString(),
   };
-  if(existing.id) {
-    await sb.from('operator_billing').update(data).eq('id', existing.id);
-  } else {
-    await sb.from('operator_billing').insert(data);
-  }
+  await callOperatorEdge({ action: 'update_billing', business_id: clientId, ...data });
   await loadOperatorData();
   hideLoading();
   renderOpContent();
@@ -5682,9 +5697,9 @@ async function openOperatorClient(clientId) {
   const team    = OP.allProfiles.filter(p => p.business_id == clientId && p.id != clientId);
   const billing = OP.billing.find(b => b.business_id == clientId) || {};
 
-  // Load notes for this client
-  const { data: notes } = await sb.from('operator_notes').select('*').eq('business_id', String(clientId)).order('created_at', {ascending:false});
-  OP.notes[clientId] = notes || [];
+  // Load notes via Edge Function
+  const notesRes = await callOperatorEdge({ action: 'get_notes', business_id: clientId });
+  OP.notes[clientId] = notesRes.notes || [];
 
   document.getElementById('op-client-title').textContent = client?.store_name || client?.email || 'Client';
 
@@ -5751,15 +5766,15 @@ async function openOperatorClient(clientId) {
 async function addOpNote(clientId) {
   const note = document.getElementById('op-note-input')?.value.trim();
   if(!note) return;
-  await sb.from('operator_notes').insert({ business_id: String(clientId), note });
-  toast('✓ Note saved');
-  openOperatorClient(clientId);
+  const res = await callOperatorEdge({ action: 'add_note', business_id: clientId, note });
+  if(res.ok) { toast('✓ Note saved'); openOperatorClient(clientId); }
+  else toast('Failed: ' + (res.error||'unknown'), 'err');
 }
 
 async function opForceSignOut(clientId) {
   if(!confirm('Force sign out all sessions for this client?')) return;
   showLoading('Forcing sign out...');
-  await sb.from('profiles').update({ session_token: null }).eq('business_id', String(clientId));
+  await callOperatorEdge({ action: 'force_signout', business_id: clientId });
   hideLoading();
   toast('✓ Sessions cleared');
 }
@@ -5767,12 +5782,7 @@ async function opForceSignOut(clientId) {
 async function opSuspendClient(clientId) {
   if(!confirm('Suspend this client account?')) return;
   showLoading('Suspending...');
-  const existing = OP.billing.find(b => b.business_id == clientId);
-  if(existing) {
-    await sb.from('operator_billing').update({ plan: 'suspended', updated_at: new Date().toISOString() }).eq('id', existing.id);
-  } else {
-    await sb.from('operator_billing').insert({ business_id: String(clientId), plan: 'suspended' });
-  }
+  await callOperatorEdge({ action: 'suspend', business_id: clientId });
   await loadOperatorData();
   hideLoading();
   toast('Account suspended');
@@ -6431,7 +6441,7 @@ async function notifyHighDiscount(discount, total) {
   const s = S_notifSettings || {};
   if(s.high_discount === false) return;
   const threshold = s.high_discount_threshold || 20;
-  const pct = total > 0 ? (discount/total)*100 : 0;
+  const pct = (total+discount) > 0 ? (discount/(total+discount))*100 : 0;
   if(pct < threshold) return;
   await createNotification('high_discount', 'High Discount Alert', `${pct.toFixed(0)}% discount (${fmt(discount)}) applied to ${fmt(total+discount)} sale`, 'history');
 }
