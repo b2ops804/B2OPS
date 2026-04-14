@@ -1332,7 +1332,7 @@ textarea.finput{resize:none;min-height:80px}
       <button class="op-tab" onclick="opTab('clients',this)">Clients</button>
       <button class="op-tab" onclick="opTab('analytics',this)">Analytics</button>
       <button class="op-tab" onclick="opTab('announcements',this)">Announce</button>
-      <button class="op-tab" onclick="opTab('billing',this)">Billing</button>
+      <button class="op-tab" onclick="opTab('billing',this)">Licensing</button>
     </div>
     <div id="op-content"></div>
   </div>
@@ -5644,43 +5644,98 @@ async function saveAnnouncement(title, body, target) {
 
 // ── BILLING TAB ──
 function renderOpBilling() {
+  const today = new Date().toISOString().slice(0,10);
+  const in7   = new Date(Date.now()+7*864e5).toISOString().slice(0,10);
+
+  // Platform totals
+  const paid      = OP.clients.filter(c => (OP.billing.find(b=>b.business_id==c.id)||{}).plan === 'paid');
+  const trial     = OP.clients.filter(c => { const p=(OP.billing.find(b=>b.business_id==c.id)||{}).plan; return !p||p==='trial'; });
+  const free      = OP.clients.filter(c => (OP.billing.find(b=>b.business_id==c.id)||{}).plan === 'free');
+  const suspended = OP.clients.filter(c => (OP.billing.find(b=>b.business_id==c.id)||{}).plan === 'suspended');
+  const mrr       = OP.billing.filter(b=>b.plan==='paid').reduce((a,b)=>a+(b.monthly_revenue||0),0);
+  const lifetime  = OP.billing.reduce((a,b)=>a+((b.monthly_revenue||0)*(b.months_active||0)),0);
+  const avgRev    = paid.length ? mrr/paid.length : 0;
+  const overdue   = OP.billing.filter(b=>b.payment_status==='overdue').length;
+  const expiringSoon = OP.billing.filter(b=>b.trial_expires && b.trial_expires>=today && b.trial_expires<=in7).length;
+
   return `
-    <div class="sec" style="margin-top:0">Client Plans</div>
-    ${OP.clients.map(c => {
-      const b = OP.billing.find(x => x.business_id == c.id) || {};
-      return `<div class="card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-weight:800">${c.store_name||c.email}</div>
-          <span class="plan-badge ${b.plan||'trial'}">${b.plan||'trial'}</span>
+    <div class="sec" style="margin-top:0">Platform Revenue</div>
+    <div class="op-stat-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="op-stat"><div class="op-stat-val">${fmt(mrr)}</div><div class="op-stat-label">MRR</div></div>
+      <div class="op-stat"><div class="op-stat-val">${fmt(lifetime)}</div><div class="op-stat-label">Lifetime Rev</div></div>
+      <div class="op-stat"><div class="op-stat-val">${fmt(mrr*12)}</div><div class="op-stat-label">Projected ARR</div></div>
+      <div class="op-stat"><div class="op-stat-val">${avgRev>0?fmt(avgRev):'—'}</div><div class="op-stat-label">Avg / Client</div></div>
+    </div>
+
+    <div class="sec">Client Breakdown</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:var(--grn)">${paid.length}</div><div class="op-stat-label">Paid</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:#60a5fa">${trial.length}</div><div class="op-stat-label">Trial</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:var(--t3)">${free.length}</div><div class="op-stat-label">Free</div></div>
+      <div class="op-stat"><div class="op-stat-val" style="font-size:22px;color:var(--red)">${suspended.length}</div><div class="op-stat-label">Suspended</div></div>
+    </div>
+
+    ${overdue > 0 ? `<div class="card" style="border-color:var(--red);margin-bottom:12px">
+      <div style="font-weight:800;color:var(--red);font-size:13px">⚠️ ${overdue} Overdue Payment${overdue>1?'s':''}</div>
+    </div>` : ''}
+    ${expiringSoon > 0 ? `<div class="card" style="border-color:#f59e0b;margin-bottom:12px">
+      <div style="font-weight:800;color:#f59e0b;font-size:13px">⏳ ${expiringSoon} Trial${expiringSoon>1?'s':''} Expiring Within 7 Days</div>
+    </div>` : ''}
+
+    <div class="sec">Client Licensing</div>
+    ${OP.clients.map(cl => {
+      const b = OP.billing.find(x => x.business_id == cl.id) || {};
+      const plan = b.plan || 'trial';
+      const monthsActive = b.months_active || 0;
+      const lifetimeClient = (b.monthly_revenue||0) * monthsActive;
+      const trialDaysLeft = b.trial_expires ? Math.max(0, Math.ceil((new Date(b.trial_expires)-new Date())/864e5)) : null;
+      const expiringSoon = b.trial_expires && b.trial_expires >= today && b.trial_expires <= in7;
+
+      return `<div class="card" style="margin-bottom:10px${plan==='suspended'?';border-color:var(--red)':expiringSoon?';border-color:#f59e0b':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:800;font-size:14px">${cl.store_name||cl.email}</div>
+          <span class="plan-badge ${plan}">${plan}</span>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-          <span style="font-size:11px;color:var(--t2)">Payment: <b style="color:${b.payment_status==='paid'?'var(--grn)':b.payment_status==='overdue'?'var(--red)':'var(--t2)'}">${b.payment_status||'pending'}</b></span>
-          ${b.trial_expires ? `<span style="font-size:11px;color:var(--t2)">Trial expires: ${b.trial_expires}</span>` : ''}
-          ${b.monthly_revenue ? `<span style="font-size:11px;color:var(--grn)">${fmt(b.monthly_revenue)}/mo</span>` : ''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+          <div style="font-size:11px;color:var(--t2)">Monthly Rate<br/><b style="color:var(--t1);font-size:13px">${b.monthly_revenue?fmt(b.monthly_revenue):'-'}</b></div>
+          <div style="font-size:11px;color:var(--t2)">Lifetime Rev<br/><b style="color:var(--grn);font-size:13px">${lifetimeClient>0?fmt(lifetimeClient):'-'}</b></div>
+          <div style="font-size:11px;color:var(--t2)">Payment Status<br/><b style="color:${b.payment_status==='paid'?'var(--grn)':b.payment_status==='overdue'?'var(--red)':'var(--t2)'};font-size:13px">${b.payment_status||'pending'}</b></div>
+          <div style="font-size:11px;color:var(--t2)">Months Active<br/><b style="color:var(--t1);font-size:13px">${monthsActive||'-'}</b></div>
+          ${b.first_payment_date ? `<div style="font-size:11px;color:var(--t2)">First Payment<br/><b style="color:var(--t1);font-size:13px">${b.first_payment_date}</b></div>` : ''}
+          ${b.last_payment_date ? `<div style="font-size:11px;color:var(--t2)">Last Payment<br/><b style="color:var(--t1);font-size:13px">${b.last_payment_date}</b></div>` : ''}
+          ${b.next_billing_date ? `<div style="font-size:11px;color:var(--t2)">Next Billing<br/><b style="color:var(--gold);font-size:13px">${b.next_billing_date}</b></div>` : ''}
+          ${b.trial_expires ? `<div style="font-size:11px;color:var(--t2)">Trial Expires<br/><b style="color:${expiringSoon?'#f59e0b':'var(--t1)'};font-size:13px">${b.trial_expires}${trialDaysLeft!==null?' ('+trialDaysLeft+'d)':''}</b></div>` : ''}
         </div>
-        <button class="btn" style="font-size:11px;padding:6px 12px" onclick="editClientBilling('${c.id}')">Edit Billing</button>
+        <button class="btn" style="font-size:11px;padding:6px 12px" onclick="editClientBilling('${cl.id}')">Edit Billing</button>
       </div>`;
     }).join('')}
   `;
 }
 
 async function editClientBilling(clientId) {
-  const client = OP.clients.find(c => c.id == clientId);
   const existing = OP.billing.find(b => b.business_id == clientId) || {};
   const plan = prompt('Plan (free/trial/paid/suspended):', existing.plan||'trial');
-  if(!plan) return;
-  const payment = prompt('Payment status (paid/overdue/pending):', existing.payment_status||'pending');
-  const revenue = prompt('Monthly revenue ($):', existing.monthly_revenue||0);
-  const trialExp = prompt('Trial expiry date (YYYY-MM-DD or blank):', existing.trial_expires||'');
+  if(plan === null) return;
+  const payment    = prompt('Payment status (paid/overdue/pending):', existing.payment_status||'pending');
+  const revenue    = prompt('Monthly rate ($):', existing.monthly_revenue||0);
+  const months     = prompt('Months active:', existing.months_active||0);
+  const firstPay   = prompt('First payment date (YYYY-MM-DD or blank):', existing.first_payment_date||'');
+  const lastPay    = prompt('Last payment date (YYYY-MM-DD or blank):', existing.last_payment_date||'');
+  const nextBill   = prompt('Next billing date (YYYY-MM-DD or blank):', existing.next_billing_date||'');
+  const trialExp   = prompt('Trial expiry date (YYYY-MM-DD or blank):', existing.trial_expires||'');
 
   showLoading('Saving...');
   const data = {
-    business_id: String(clientId),
-    plan,
-    payment_status: payment||'pending',
-    monthly_revenue: parseFloat(revenue)||0,
-    trial_expires: trialExp||null,
-    updated_at: new Date().toISOString(),
+    business_id:       String(clientId),
+    plan:              plan || 'trial',
+    payment_status:    payment || 'pending',
+    monthly_revenue:   parseFloat(revenue) || 0,
+    months_active:     parseInt(months) || 0,
+    first_payment_date: firstPay || null,
+    last_payment_date:  lastPay  || null,
+    next_billing_date:  nextBill || null,
+    trial_expires:      trialExp || null,
+    updated_at:         new Date().toISOString(),
   };
   await callOperatorEdge({ action: 'update_billing', business_id: clientId, ...data });
   await loadOperatorData();
